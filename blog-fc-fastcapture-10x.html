@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Case thực chiến · FC-FastCapture · 10X Life OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --n-950:#070718; --n-900:#0A0A24; --n-800:#12123A; --n-700:#1A1A50;
+  --n-400:#5858A8; --n-300:#8888C0; --n-200:#B0B0D8; --n-100:#DDDDF0;
+  --o-600:#A84F20; --o-500:#C96028; --o-400:#D97538; --o-300:#E89060;
+  --cream:#F5F2EC; --sand:#C9B79C; --green:#5BC490; --white:#fff;
+  --f-head:'Fraunces','Georgia',serif; --f-body:'Be Vietnam Pro',sans-serif; --f-mono:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.22,1,.36,1); --wrap:760px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{font-family:var(--f-body);background:var(--n-950);color:var(--n-200);line-height:1.75;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;font-weight:400}
+h1,h2,h3{font-family:var(--f-head);color:var(--white);font-weight:600;letter-spacing:-.015em;
+  line-height:1.12;font-optical-sizing:auto;text-wrap:balance}
+.veil{position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:radial-gradient(120% 80% at 50% -10%,#16163e 0%,var(--n-900) 42%,var(--n-950) 100%)}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.025;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{max-width:var(--wrap);margin-inline:auto;padding-inline:clamp(22px,5vw,40px)}
+.eyebrow{font-family:var(--f-mono);font-size:12px;font-weight:500;letter-spacing:.22em;text-transform:uppercase;color:var(--o-300)}
+.rv{opacity:0;transform:translateY(14px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.rv.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.rv{opacity:1!important;transform:none!important}}
+
+/* HERO */
+.hero{min-height:90vh;display:flex;flex-direction:column;justify-content:center;padding:90px 0 64px;text-align:center}
+.hero .eyebrow{margin-bottom:28px;display:inline-block}
+.hero h1{font-size:clamp(40px,8vw,82px);font-weight:500;letter-spacing:-.025em;line-height:1.0;margin-bottom:24px}
+.hero h1 em{color:var(--o-400);font-style:italic;font-weight:600}
+.hero .creed{font-family:var(--f-head);font-size:clamp(18px,2.6vw,25px);font-style:italic;font-weight:400;
+  color:var(--n-100);line-height:1.5;max-width:560px;margin:0 auto}
+.hero .creed em{color:var(--o-300)}
+.hero .role{font-family:var(--f-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--n-400);margin-top:30px}
+
+/* SECTION */
+.sec{padding:clamp(40px,6vw,68px) 0}
+.sec-head{margin-bottom:30px}
+.sec-head .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.sec-head .eyebrow::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,96,40,.4),transparent);max-width:140px}
+.sec-head h2{font-size:clamp(27px,4.4vw,40px);font-weight:500}
+.sec-head h2 em{color:var(--o-400);font-style:italic}
+.sec p{font-size:clamp(15px,1.9vw,17px);color:var(--n-200);margin-bottom:16px}
+.sec p.mut{color:var(--n-300)}
+.sec strong{color:var(--white);font-weight:500}
+
+/* reframe — chữ ký "Không phải X. Mà là Y." */
+.reframe{font-family:var(--f-head);font-style:italic;font-size:clamp(19px,2.6vw,24px);line-height:1.5;
+  color:var(--n-100);border-left:2px solid var(--o-500);background:rgba(201,96,40,.06);
+  padding:18px 24px;border-radius:0 12px 12px 0;margin:26px 0}
+.reframe b{color:var(--o-300);font-weight:500;font-style:italic}
+
+/* arrow list */
+.arrows{list-style:none;margin:18px 0}
+.arrows li{position:relative;padding-left:26px;margin-bottom:11px;color:var(--n-200);font-size:15.5px}
+.arrows li::before{content:'→';position:absolute;left:0;color:var(--o-400);font-weight:600}
+.arrows li b{color:var(--white);font-weight:500}
+
+/* evidence — bằng chứng thật (mono) */
+.ev{font-family:var(--f-mono);font-size:13px;line-height:1.85;color:var(--n-200);
+  background:var(--n-900);border:1px solid rgba(255,255,255,.07);border-radius:12px;
+  padding:18px 20px;margin:22px 0;overflow-x:auto;white-space:pre-wrap}
+.ev .ok{color:var(--green)} .ev .ac{color:var(--o-300)} .ev .dim{color:var(--n-400)}
+code{font-family:var(--f-mono);font-size:.92em;color:var(--o-300);background:rgba(201,96,40,.08);padding:1px 6px;border-radius:5px}
+
+.divider{display:flex;align-items:center;gap:18px;padding:6px 0;margin:8px 0}
+.divider .ln{flex:1;height:1px;background:rgba(255,255,255,.07)}
+.divider svg{width:20px;height:20px;color:var(--o-500);opacity:.85}
+
+/* pull quote (Hiền Triết) */
+.pull{font-family:var(--f-head);font-style:italic;font-size:clamp(22px,3.4vw,30px);line-height:1.4;
+  color:var(--white);text-align:center;margin:36px auto;max-width:600px}
+.pull span{color:var(--o-300)}
+
+/* lesson cards */
+.cards{display:grid;gap:14px;margin:22px 0}
+.card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:20px 22px}
+.card .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--o-300);margin-bottom:8px}
+.card .t{font-family:var(--f-head);color:var(--white);font-size:18px;font-weight:600;margin-bottom:6px;letter-spacing:-.01em}
+.card .d{font-size:14.5px;color:var(--n-300);line-height:1.7}
+.card .d b{color:var(--n-100);font-weight:500}
+
+/* ── FIGURES / VISUALS ── */
+.figure{margin:34px 0}
+.fig-cap{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--n-400);text-align:center;margin-top:15px}
+.panel{background:linear-gradient(180deg,var(--n-800),var(--n-900));border:1px solid rgba(255,255,255,.08);border-radius:18px;
+  box-shadow:0 24px 60px -28px #000,inset 0 1px 0 rgba(255,255,255,.04)}
+
+/* app mockup — floating bar */
+.mock-bar{display:flex;align-items:stretch;gap:6px;padding:12px;max-width:560px;margin-inline:auto}
+.fc-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,var(--o-400),var(--o-600));
+  display:flex;align-items:center;justify-content:center;font-family:var(--f-head);font-weight:700;color:#fff;font-size:18px;
+  letter-spacing:-.02em;flex-shrink:0;box-shadow:0 6px 16px -6px rgba(201,96,40,.6)}
+.mode-cell{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 4px 7px;border-radius:11px;transition:background .2s}
+.mode-cell:hover{background:rgba(255,255,255,.04)}
+.mode-cell svg{width:23px;height:23px;color:var(--n-100);stroke-width:1.7}
+.mode-cell .nm{font-size:10px;color:var(--n-300);text-align:center;line-height:1.25;font-weight:400}
+.mode-cell .key{font-family:var(--f-mono);font-size:10px;color:var(--o-300);letter-spacing:.04em}
+.mode-cell.hot svg{color:var(--o-400)}
+
+/* editor mini-mock */
+.mock-ed{max-width:430px;margin-inline:auto;padding:0;overflow:hidden}
+.ed-tools{display:flex;gap:5px;padding:9px 11px;border-bottom:1px solid rgba(255,255,255,.07);align-items:center}
+.ed-tools .tool{width:27px;height:27px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.04)}
+.ed-tools .tool svg{width:15px;height:15px;color:var(--n-200);stroke-width:1.7}
+.ed-tools .tool.on{background:rgba(201,96,40,.18)}.ed-tools .tool.on svg{color:var(--o-300)}
+.ed-tools .dot{width:13px;height:13px;border-radius:50%;flex-shrink:0}
+.ed-tools .spacer{flex:1}
+.ed-tools .act{font-family:var(--f-mono);font-size:10px;padding:5px 10px;border-radius:7px;color:var(--n-200);border:1px solid rgba(255,255,255,.12)}
+.ed-tools .act.pri{background:var(--o-500);color:#fff;border-color:transparent}
+.ed-canvas{height:150px;background:linear-gradient(135deg,#1d2740,#141b2e);position:relative}
+
+/* workflow steps */
+.flow{display:flex;align-items:flex-start;justify-content:center;gap:4px;flex-wrap:wrap}
+.flow-step{display:flex;flex-direction:column;align-items:center;gap:9px;width:118px;text-align:center}
+.flow-ic{width:54px;height:54px;border-radius:15px;border:1px solid rgba(201,96,40,.3);background:rgba(201,96,40,.07);
+  display:flex;align-items:center;justify-content:center}
+.flow-ic svg{width:25px;height:25px;color:var(--o-400);stroke-width:1.7}
+.flow-step .st{font-size:13px;color:var(--n-100);font-weight:500;line-height:1.3}
+.flow-step .ss{font-family:var(--f-mono);font-size:10px;color:var(--n-400);letter-spacing:.04em}
+.flow-arrow{color:var(--o-500);font-size:22px;align-self:center;margin-top:14px;opacity:.7}
+
+/* stable-signing infographic */
+.sign{display:grid;gap:14px}
+.sign-row{display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:13px;border:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
+.sign-row.bad{background:rgba(224,119,92,.05);border-color:rgba(224,119,92,.22)}
+.sign-row.good{background:rgba(42,122,80,.06);border-color:rgba(91,196,144,.25)}
+.sign-tag{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;width:74px;flex-shrink:0}
+.sign-row.bad .sign-tag{color:#E0775C}.sign-row.good .sign-tag{color:var(--green)}
+.builds{display:flex;align-items:center;gap:7px;flex:1;flex-wrap:wrap}
+.bld{font-family:var(--f-mono);font-size:10px;padding:5px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.12);color:var(--n-300)}
+.sign-row.bad .bld{color:#E0775C;border-color:rgba(224,119,92,.3)}
+.sign-row.good .bld{color:var(--green);border-color:rgba(91,196,144,.3)}
+.sign-out{font-size:12.5px;font-weight:500;flex-shrink:0}
+.sign-row.bad .sign-out{color:#E0775C}.sign-row.good .sign-out{color:var(--green)}
+.sign-arrow{color:var(--n-400)}
+
+/* arc chart */
+.arc-fig{max-width:600px;margin-inline:auto;padding:26px 22px 18px}
+.arc-fig svg{width:100%;height:auto;display:block}
+.arc-lbl{font-family:var(--f-mono);font-size:9.5px;fill:var(--n-300);letter-spacing:.02em}
+.arc-pt-lbl{font-family:var(--f-mono);font-size:10px;fill:var(--n-200)}
+
+/* named framework card */
+.framework{margin:24px 0}
+.fw-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.fw-name{font-family:var(--f-head);font-style:italic;font-size:clamp(22px,3vw,28px);color:var(--white);font-weight:600;letter-spacing:-.01em}
+.fw-name b{color:var(--o-400);font-style:italic}
+.fw-tag{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--o-300)}
+.framework .panel{padding:clamp(22px,3vw,30px)}
+.fw-save{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--n-400);text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+
+/* CTA */
+.cta{text-align:center;margin:30px 0 6px;padding:clamp(30px,4vw,44px) clamp(22px,4vw,40px);
+  background:radial-gradient(120% 130% at 50% 0%,rgba(201,96,40,.14),transparent 70%),var(--n-800);
+  border:1px solid rgba(201,96,40,.22);border-radius:20px}
+.cta-line{font-family:var(--f-head);font-size:clamp(17px,2.2vw,21px);color:var(--n-100);line-height:1.5;margin-bottom:24px}
+.cta-btn{display:inline-block;font-family:var(--f-body);font-weight:600;font-size:16px;color:#fff;text-decoration:none;
+  padding:15px 30px;border-radius:12px;background:linear-gradient(150deg,var(--o-400),var(--o-600));
+  box-shadow:0 14px 30px -12px rgba(201,96,40,.7);transition:transform .2s var(--ease),box-shadow .2s}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:0 20px 40px -12px rgba(201,96,40,.85)}
+.cta-sub{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;color:var(--n-400);margin-top:16px}
+.roadmap-line{font-size:13px;color:var(--n-400);text-align:center;margin-top:24px}
+.roadmap-line b{color:var(--n-300);font-weight:500}
+
+footer{padding:60px 0 80px;text-align:center;border-top:1px solid rgba(255,255,255,.07);margin-top:40px}
+footer .sig{font-family:var(--f-head);font-style:italic;font-size:20px;color:var(--white)}
+footer .sub{font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--n-400);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="veil"></div><div class="grain"></div>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow rv in">Case thực chiến · Đời Đạo Song Tu với AI</span>
+    <h1 class="rv in">Con bug khó nhất,<br>tôi đã <em>xóa nó đi.</em></h1>
+    <p class="creed rv in">Và đó là quyết định đúng nhất của cả dự án.<br><em>Buông — không phải bỏ cuộc.</em></p>
+    <div class="role rv in">FC-FastCapture · App chụp màn hình + GIF · macOS</div>
+  </div>
+</header>
+
+<!-- MỞ ĐẦU -->
+<section class="sec"><div class="wrap rv">
+  <p>Tôi đo được con bug đó <strong>chạy</strong>. Log không nói dối. Vậy mà tôi vẫn xóa sạch.</p>
+  <p>Vì cố thêm lúc đó là phục vụ cái tôi — không phải người dùng. Nhưng để hiểu vì sao một người lại xóa thứ mình vừa làm cho chạy được, phải quay lại từ đầu.</p>
+  <p class="mut">Sáu tháng trước, ý tưởng rất rõ: một app nhỏ trên macOS — chụp màn hình, quay GIF, sửa ảnh ngay tại chỗ. Nghe đơn giản. Thực tế là một bãi mìn. Build xong → crash. Sửa xong → mất quyền. Có đêm tôi gõ đúng một câu cho AI: <em style="color:var(--n-100)">"Kiểm tra lại 3 lần trước khi ship."</em> Rồi đóng máy. Gần như bỏ.</p>
+  <p><strong>Bài này không phải về app của tôi.</strong> Mà về cách <em style="color:var(--o-300);font-style:normal;font-weight:500">bạn</em> làm việc với AI — và biết khi nào dừng — để không bao giờ bế tắc (hay bỏ cuộc) như cũ. App chỉ là bằng chứng: giờ nó rút mỗi lần chụp-sửa-gửi từ <strong>4 thao tác xuống 2</strong>, không một lần crash.</p>
+
+  <div class="figure rv">
+    <div class="panel mock-bar">
+      <div class="fc-mark">FC</div>
+      <div class="mode-cell hot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 L6 13 H11 L10 21 L18 10 H13 Z"/></svg>
+        <span class="nm">Chụp nhanh</span><span class="key">⌘1</span>
+      </div>
+      <div class="mode-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 L5 15.5 L15.5 5 L19 8.5 L8.5 19 Z"/><path d="M13 7.5 L16.5 11"/></svg>
+        <span class="nm">Chụp + Edit</span><span class="key">⌘2</span>
+      </div>
+      <div class="mode-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1.5"/><path d="M8.5 12 H15.5 M8.5 12 L10 10.5 M8.5 12 L10 13.5 M15.5 12 L14 10.5 M15.5 12 L14 13.5"/></svg>
+        <span class="nm">Khoá kích thước</span><span class="key">⌘3</span>
+      </div>
+      <div class="mode-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 9 H20"/><circle cx="7" cy="7" r="0.6" fill="currentColor"/></svg>
+        <span class="nm">Chụp cửa sổ</span><span class="key">⌘4</span>
+      </div>
+      <div class="mode-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M10 9.5 L14.5 12 L10 14.5 Z" fill="currentColor"/></svg>
+        <span class="nm">Quay GIF</span><span class="key">⌘5</span>
+      </div>
+    </div>
+    <div class="fig-cap">Thanh nổi FC-FastCapture — 5 chế độ, một phím tắt mỗi cái</div>
+  </div>
+
+  <div class="figure rv">
+    <div class="panel mock-ed">
+      <div class="ed-tools">
+        <div class="tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M6 7 H18 M12 7 V18"/></svg></div>
+        <div class="tool on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 L19 5 M19 5 H12 M19 5 V12"/></svg></div>
+        <div class="tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="6" width="14" height="12" rx="1.5"/></svg></div>
+        <div class="tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M4 16 L13 7 L17 11 L8 20 H4 Z"/></svg></div>
+        <div class="tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M10 5 V19 M14 5 V19 M5 10 H19 M5 14 H19" stroke-opacity=".55"/></svg></div>
+        <div class="tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M11 9.5 L13 9 V15"/></svg></div>
+        <span class="dot" style="background:#C96028"></span><span class="dot" style="background:#5BC490"></span><span class="dot" style="background:#DDDDF0"></span>
+        <span class="spacer"></span>
+        <span class="act">Copy</span><span class="act pri">Lưu</span>
+      </div>
+      <div class="ed-canvas">
+        <svg viewBox="0 0 430 150" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <rect x="34" y="30" width="150" height="7" rx="3.5" fill="rgba(255,255,255,.13)"/>
+          <rect x="34" y="48" width="210" height="7" rx="3.5" fill="rgba(255,255,255,.10)"/>
+          <rect x="34" y="92" width="120" height="7" rx="3.5" fill="rgba(255,255,255,.10)"/>
+          <rect x="34" y="110" width="175" height="7" rx="3.5" fill="rgba(255,255,255,.08)"/>
+          <!-- highlight -->
+          <rect x="80" y="64" width="96" height="22" rx="4" fill="rgba(201,96,40,.32)"/>
+          <rect x="86" y="71" width="84" height="7" rx="3.5" fill="rgba(255,255,255,.22)"/>
+          <!-- arrow -->
+          <path d="M300 48 Q 245 52 196 72" fill="none" stroke="#D97538" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M196 72 L206 67 M196 72 L203 80" fill="none" stroke="#D97538" stroke-width="2.6" stroke-linecap="round"/>
+          <!-- step badge -->
+          <circle cx="320" cy="44" r="13" fill="#C96028"/>
+          <text x="320" y="49" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="600" fill="#fff">1</text>
+        </svg>
+      </div>
+    </div>
+    <div class="fig-cap">Trình sửa ngay trên ảnh — mũi tên · khung · bút dạ · làm mờ · đánh số · màu · undo</div>
+  </div>
+</div></section>
+
+<div class="wrap"><div class="divider rv"><div class="ln"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 18 L10.4 12.7 L12 12 L13.6 12.7 Z"/><path d="M12 6 L13.6 12 L12 12.6 L10.4 12 Z" fill="currentColor"/></svg><div class="ln"></div></div></div>
+
+<!-- CÚ VẤP -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Phần 1 · Những cú vấp</span><h2>Mỗi lỗi dạy lại <em>một điều</em></h2></div>
+  <p class="rv">Đừng sửa theo cảm giác. Sửa theo cảm giác → sửa nhầm chỗ.</p>
+
+  <p class="rv"><strong>Cú vấp đầu: "ấn phím lưu thì app thoát."</strong> Triệu chứng gọn vậy. Nếu đoán, tôi đi sửa nút Lưu. Đo kỹ thì sự thật lộ ra: thư viện phím tắt gọi một API hệ thống ngoài luồng chính trên macOS 26 → crash tầng C, không try/except nào bắt được.</p>
+  <div class="reframe rv">"App thoát khi lưu" không phải lỗi nút Lưu.<br><b>Mà là thư viện gọi sai luồng.</b></div>
+  <p class="mut rv">Lời giải không phải vá. Mà là thay máu — dựng phím tắt bằng một event tap chạy đúng luồng chính. Không TIS. Không crash.</p>
+
+  <p class="rv"><strong>Cú vấp hai: "chỉ viết được mũi tên, không gõ được chữ."</strong> Lại một triệu chứng đánh lừa. Gốc rễ: chọn sai loại cửa sổ — loại "Tool" trên macOS không thể nhận bàn phím.</p>
+  <div class="reframe rv">"Không gõ được chữ" không phải lỗi ô text.<br><b>Mà là chọn sai loại cửa sổ.</b></div>
+</div></section>
+
+<!-- NÚT THẮT -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Phần 2 · Nút thắt</span><h2>Cái giá ẩn của <em>mỗi lần build</em></h2></div>
+  <p class="rv">Build lần thứ chín. Lại crash. Tôi sửa một dòng — người dùng phải vào cài đặt cấp quyền lại, lần thứ năm trong một tối. Đây là chỗ tôi suýt buông.</p>
+  <p class="rv">Mỗi lần build lại, chữ ký đổi. macOS coi đó là app <em>khác</em> → âm thầm xoá quyền cũ. Cứ sửa một dòng là phải cấp quyền lại. Mỗi. Lần.</p>
+  <div class="reframe rv">Một app tốt mà bắt cấp quyền 5 lần,<br><b>vẫn là một app tệ.</b></div>
+  <p class="rv">Đo ra gốc rễ rồi, lời giải mới đúng tầm: ký bằng một <strong>chứng chỉ cố định</strong>. Bằng chứng nằm ở "designated requirement" của bản build:</p>
+  <div class="ev rv">designated => identifier "...fcfastcapture"
+            and <span class="ac">certificate root</span> = H"e0152e99…"
+
+<span class="dim"># khoá theo CHỨNG CHỈ — không theo nội dung build</span>
+<span class="dim"># → mọi bản sau giữ nguyên quyền. Làm 1 lần. Dùng mãi.</span></div>
+
+  <div class="figure rv">
+    <div class="sign">
+      <div class="sign-row bad">
+        <span class="sign-tag">Ad-hoc</span>
+        <div class="builds">
+          <span class="bld">build · de9425…</span><span class="sign-arrow">→</span>
+          <span class="bld">build · 4ee5ea…</span><span class="sign-arrow">→</span>
+          <span class="bld">build · cf1b54…</span>
+        </div>
+        <span class="sign-out">✗ cấp quyền lại mỗi lần</span>
+      </div>
+      <div class="sign-row good">
+        <span class="sign-tag">Cố định</span>
+        <div class="builds">
+          <span class="bld">build</span><span class="bld">build</span><span class="bld">build</span>
+          <span class="sign-arrow">→</span><span class="bld">certificate root · e0152e99…</span>
+        </div>
+        <span class="sign-out">✓ giữ nguyên quyền</span>
+      </div>
+    </div>
+    <div class="fig-cap">Chữ ký đổi mỗi build = macOS xoá quyền. Một chứng chỉ cố định = nhớ mãi.</div>
+  </div>
+
+  <p class="rv">Cụ thể với bạn: ngày build 15 lần × 2 phút cấp lại 5 quyền = <strong>30 phút bốc hơi mỗi ngày</strong>. Sau khi ký cố định: 0. Làm 1 lần cho đàng hoàng → để lại một tài sản → dùng mãi.</p>
+  <p class="mut rv">Đó là khoảnh khắc con app ngừng chống lại tôi.</p>
+</div></section>
+
+<!-- MÀI GIŨA -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Phần 3 · Mài giũa</span><h2>Những chi tiết làm nên <em>"10 điểm"</em></h2></div>
+  <ul class="arrows rv">
+    <li><b>Phím tắt rút còn 2 nút</b> — người dùng kêu combo 3 nút chậm. Đổi sang ⌘1–⌘5.</li>
+    <li><b>ESC thoát vùng chọn</b> — không cần bấm nút Huỷ.</li>
+    <li><b>Quay GIF mà vẫn click được</b> — khung viền cho chuột xuyên qua, thao tác app bình thường khi đang quay.</li>
+    <li><b>Edit ngay trên vùng chọn</b> — kéo, thả, vào sửa. Bỏ một bước.</li>
+    <li><b>Xuất GIF không bao giờ fail</b> — có đường dự phòng riêng, không phụ thuộc thư viện ngoài.</li>
+  </ul>
+
+  <div class="figure rv">
+    <div class="panel" style="padding:30px 22px">
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11 H7.01 M11 11 H11.01 M15 11 H15.01 M7 14.5 H15"/></svg></div>
+          <div class="st">Bấm phím tắt</div><div class="ss">⌘2</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2.5"><rect x="4" y="5" width="16" height="14" rx="1"/></svg></div>
+          <div class="st">Kéo chọn vùng</div><div class="ss">drag</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M8 15 L14 9 L16 11 L10 17 Z"/><path d="M8 15 L8 17 L10 17"/></svg></div>
+          <div class="st">Sửa ngay trên ảnh</div><div class="ss">in-place</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 14 V18 A1 1 0 0 0 6 19 H18 A1 1 0 0 0 19 18 V14"/><path d="M12 4 V14 M8 10 L12 14 L16 10"/></svg></div>
+          <div class="st">Copy hoặc Lưu</div><div class="ss">⌘C / .png</div>
+        </div>
+      </div>
+    </div>
+    <div class="fig-cap">Bốn nhịp — không một bước thừa. Trước đây là: chọn → chụp → rồi mới sửa.</div>
+  </div>
+</div></section>
+
+<div class="wrap"><div class="divider rv"><div class="ln"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 18 L10.4 12.7 L12 12 L13.6 12.7 Z"/><path d="M12 6 L13.6 12 L12 12.6 L10.4 12 Z" fill="currentColor"/></svg><div class="ln"></div></div></div>
+
+<!-- CHƯƠNG FULLSCREEN — biết khi nào dừng -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Phần 4 · Bug khó nhất</span><h2>Khi câu trả lời đúng là <em>"dừng lại"</em></h2></div>
+  <p class="rv">Một người dùng báo: bấm phím chụp khi app đang toàn màn hình thì <em>không chạy</em>.</p>
+  <p class="rv">Tôi lao vào. Thử cách một: đặt thuộc tính cho cửa sổ hiện trên mọi không gian. Không đủ. Cách hai: nâng cửa sổ lên mức cao nhất — như công cụ chụp của chính macOS. Hiện được, nhưng ESC chết. Cách ba: cho chuột và phím đi vòng qua event tap, không kích hoạt app.</p>
+  <p class="rv">Và tôi <strong>đo được nó chạy</strong> — overlay nhận chuột, vẽ ra đúng vùng chọn, không nhảy không gian:</p>
+  <div class="ev rv"><span class="dim">▶ mode2 vào</span>
+  ov.press   <span class="dim">btn=1 pos=(350,300)</span>   <span class="ok">← chuột qua tap</span>
+  ov._finish <span class="ac">rect=301x121</span>           <span class="ok">← chọn vùng OK</span></div>
+  <p class="rv">Nhưng cái editor mở ra sau đó vẫn cần kích hoạt app để gõ được. Và tôi không tự dựng được cảnh "toàn màn hình thật" để test cho trọn — máy người dùng tiếng Việt, mọi cách script đều trượt.</p>
+  <p class="rv">Người dùng nhắn lại, gọn: <em style="color:var(--n-100)">"Bỏ qua đi. Tôi thu nhỏ cửa sổ lại là xong."</em></p>
+  <p class="rv">Tôi gỡ sạch toàn bộ phần đó. Trả app về trạng thái ổn định.</p>
+  <div class="reframe rv">Không phải mọi bug đều đáng sửa.<br><b>Có bug đáng… bỏ.</b></div>
+  <p class="rv">Đây là chỗ Đời chạm Đạo. Suốt sáu tháng tôi dạy huynh đệ 10X đúng một câu: <strong>cái tôi muốn hoàn hảo, phụng sự chỉ cần đủ dùng.</strong></p>
+  <p class="mut rv">Con bug này không phải bài toán code. Nó là bài kiểm tra: tôi đang sửa cho người dùng — hay đang sửa cho cái tôi của mình? Người dùng đã có lối đi: thu nhỏ cửa sổ. Cố thêm, là tôi leo một ngọn núi không ai cần tôi leo. Buông nó xuống không phải một lần thua. Mà là một lần tu điềm tĩnh — biết tách cái mình <em>muốn</em> ra khỏi cái người khác <em>cần</em>.</p>
+</div></section>
+
+<!-- ĐÁNH GIÁ 3 LẦN -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Phần 5 · Trước khi chốt</span><h2>Đánh giá <em>3 lần</em>, không tin suông</h2></div>
+  <p class="rv">Bản chốt không dựa vào "tôi nghĩ là chạy". Tôi cho nhiều con AI soi song song, rồi bắt mỗi phát hiện tự chứng minh:</p>
+  <div class="ev rv"><span class="dim">Lần 1 · Audit 6 chiều</span>   → <span class="ac">12 vấn đề thật</span> (verify đối kháng)
+<span class="dim">Lần 2 · Sửa</span>            → 12/12 đã vá
+<span class="dim">Lần 3 · Verify lại</span>     → <span class="ok">28/28 PASS · 0 hồi quy</span></div>
+  <p class="mut rv">Kẹt-busy khi lỗi chụp · re-entry qua hộp thoại · cửa sổ GIF bị thu hồi · đa-màn-hình chọn nhầm vùng · và bảy điểm nữa. Tất cả: đo, vá, đo lại.</p>
+</div></section>
+
+<!-- 10 ĐIỂM -->
+<section class="sec"><div class="wrap">
+  <div class="figure panel arc-fig rv">
+    <svg viewBox="0 0 560 232" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Đường tự tin từ muốn bỏ đến 10 điểm">
+      <defs>
+        <linearGradient id="arcFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#C96028" stop-opacity="0.22"/>
+          <stop offset="1" stop-color="#C96028" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- y hint -->
+      <text x="14" y="120" class="arc-lbl" transform="rotate(-90 14 120)" text-anchor="middle">← tự tin · chất lượng</text>
+      <!-- baseline -->
+      <line x1="40" y1="192" x2="520" y2="192" stroke="rgba(255,255,255,.10)" stroke-width="1"/>
+      <text x="280" y="222" class="arc-lbl" text-anchor="middle" fill="#5858A8">các vòng đo · vá · đo lại  →</text>
+      <!-- area + line -->
+      <path d="M50,105 L150,130 L250,172 L345,92 L420,112 L505,48 L505,192 L50,192 Z" fill="url(#arcFill)"/>
+      <path d="M50,105 L150,130 L250,172 L345,92 L420,112 L505,48" fill="none" stroke="#C96028" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- dots -->
+      <circle cx="50" cy="105" r="3.4" fill="#0A0A24" stroke="#D97538" stroke-width="2"/>
+      <circle cx="150" cy="130" r="3.4" fill="#0A0A24" stroke="#D97538" stroke-width="2"/>
+      <circle cx="250" cy="172" r="5" fill="#0A0A24" stroke="#E0775C" stroke-width="2.4"/>
+      <circle cx="345" cy="92" r="3.4" fill="#0A0A24" stroke="#D97538" stroke-width="2"/>
+      <circle cx="420" cy="112" r="3.4" fill="#0A0A24" stroke="#D97538" stroke-width="2"/>
+      <circle cx="505" cy="48" r="5.5" fill="#C96028" stroke="#F0B090" stroke-width="2"/>
+      <!-- point labels -->
+      <text x="50"  y="96"  class="arc-lbl" text-anchor="middle">giấc mơ</text>
+      <text x="150" y="121" class="arc-lbl" text-anchor="middle">app crash</text>
+      <text x="250" y="188" class="arc-pt-lbl" text-anchor="middle" fill="#E0775C" font-style="italic">"muốn bỏ"</text>
+      <text x="345" y="82"  class="arc-lbl" text-anchor="middle">ký cố định</text>
+      <text x="420" y="103" class="arc-lbl" text-anchor="middle">bỏ fullscreen</text>
+      <text x="505" y="38"  class="arc-pt-lbl" text-anchor="end" fill="#F0B090" font-style="italic">10 điểm</text>
+    </svg>
+    <div class="fig-cap">Điểm thấp nhất không phải dấu chấm hết — nó là chỗ giá trị bắt đầu</div>
+  </div>
+  <div class="pull rv">Từ một app suýt bị bỏ rơi<br>đến <span>"10đ ưng ý."</span><br>Cả chặng nằm gọn giữa hai câu nói.</div>
+</div></section>
+
+<!-- ĐÚC KẾT -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Đúc kết</span><h2>Bốn điều <em>mang theo</em></h2></div>
+  <div class="cards rv">
+    <div class="card"><div class="k">01 · Nền tảng</div><div class="t">Debug nền tảng, không chỉ debug code</div><div class="d">macOS mới phá vỡ cả thư viện "chuẩn". <b>Phải hiểu hệ điều hành, không chỉ ngôn ngữ.</b></div></div>
+    <div class="card"><div class="k">02 · Bằng chứng</div><div class="t">Đo, đừng đoán</div><div class="d">Ghi log ra file. Bắt máy <b>tự chứng minh</b> nó chạy — test, số thật, ảnh. Không tin suông.</div></div>
+    <div class="card"><div class="k">03 · Tài sản</div><div class="t">Làm 1 lần cho đàng hoàng</div><div class="d">Chứng chỉ ký cố định, một nguồn thiết kế, sổ "gotcha". <b>Mỗi cú vấp thành một tài sản dùng lại.</b></div></div>
+    <div class="card"><div class="k">04 · Điểm dừng</div><div class="t">Biết khi nào dừng</div><div class="d">Con app chỉ thực sự tốt <b>sau</b> chỗ khó nhất. Và đôi khi, sau chỗ khó nhất là một lời "bỏ qua đi" sáng suốt.</div></div>
+  </div>
+</div></section>
+
+<div class="wrap"><div class="divider rv"><div class="ln"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 18 L10.4 12.7 L12 12 L13.6 12.7 Z"/><path d="M12 6 L13.6 12 L12 12.6 L10.4 12 Z" fill="currentColor"/></svg><div class="ln"></div></div></div>
+
+<!-- BÀI HỌC THEN CHỐT -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Bài học then chốt</span><h2>Cách nói chuyện <em>với AI</em></h2></div>
+  <p class="rv">Đây là tài sản đắt nhất. Code rồi sẽ cũ. <strong>Cách làm việc với AI thì dùng lại cho mọi việc sau.</strong> Tôi gọi nó là khung này — năm nguyên tắc để làm việc với AI mà không mất quyền kiểm soát:</p>
+  <div class="framework rv">
+    <div class="fw-head"><span class="fw-name">Khung <b>CẦM LÁI</b></span><span class="fw-tag">5 nguyên tắc làm việc với AI</span></div>
+    <div class="panel">
+      <ul class="arrows" style="margin:0">
+        <li><b>Mô tả triệu chứng, đừng kê đơn.</b> Bạn báo "ấn lưu thì app thoát" — không bảo "sửa thư viện X". Bạn giữ "cái gì sai", để AI lo "vì sao sai".</li>
+        <li><b>Đo, đừng đoán — và bắt AI cũng thế.</b> Đừng nhận "tôi nghĩ là chạy". Đòi test, log, ảnh, output thật.</li>
+        <li><b>Cho AI quyền làm cho tới.</b> Audit, gỡ sạch, ký cố định — AI làm trọn khi được trao đủ quyền và bối cảnh.</li>
+        <li><b>Biết khi nào để AI hỏi.</b> Một câu hỏi 30 giây rẻ hơn một vòng làm sai.</li>
+        <li><b>Đóng vòng lặp — mỗi vòng để lại một tài sản.</b> Báo → điều tra → bằng chứng → vá → đo lại.</li>
+      </ul>
+      <div class="fw-save">↑ Chụp lại khung này — dùng cho mọi dự án AI sau</div>
+    </div>
+  </div>
+  <div class="reframe rv">Bạn cầm lái hướng đi và tiêu chuẩn.<br><b>AI cày tầng sâu và tự chứng minh.</b></div>
+</div></section>
+
+<!-- CTA -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Giờ tới lượt bạn</span><h2>Con app dang dở nào <em>bạn đang định bỏ?</em></h2></div>
+  <p class="rv">Lấy Khung <strong>CẦM LÁI</strong>, chạy đúng một vòng với AI: báo triệu chứng → bắt nó đo → đóng vòng. Rồi nhắn tôi nghe nó đi tới đâu.</p>
+  <div class="cta rv">
+    <div class="cta-line">Còn FC-FastCapture — tôi đóng gói thành bản tải miễn phí cho anh em build app cùng AI.</div>
+    <a class="cta-btn" href="landing-fc-fastcapture.html">Tải FC-FastCapture — miễn phí →</a>
+    <div class="cta-sub">macOS Apple Silicon · file .dmg · không quảng cáo, không thu phí</div>
+  </div>
+  <div class="roadmap-line rv">Sắp tới: <b>bản Mac Intel</b> · <b>bản Windows</b> — cùng một lõi, chỉ thay lớp nền tảng.</div>
+</div></section>
+
+<footer>
+  <div class="wrap rv">
+    <div class="sig">Con bug khó nhất, tôi đã xóa nó đi.<br>Và app vẫn 10 điểm.</div>
+    <div class="sub">Dev by Thắng Huyền Đức · 10X-LifeOS.Com</div>
+  </div>
+</footer>
+
+<script>
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.rv:not(.in)').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
