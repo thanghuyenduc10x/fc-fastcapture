@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FC-FastCapture — Chụp màn hình + GIF cho macOS · Quà tặng 10X Life OS</title>
+<meta name="description" content="Chụp màn hình + quay GIF, sửa ngay trên ảnh. Chạy 100% trên máy: không tài khoản, không quảng cáo, không thu phí. Miễn phí trọn đời cho macOS." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --n-950:#070718; --n-900:#0A0A24; --n-800:#12123A; --n-700:#1A1A50;
+  --n-400:#5858A8; --n-300:#8888C0; --n-200:#B0B0D8; --n-100:#DDDDF0;
+  --o-600:#A84F20; --o-500:#C96028; --o-400:#D97538; --o-300:#E89060;
+  --green:#5BC490; --red:#E0775C; --white:#fff;
+  --f-head:'Fraunces','Georgia',serif; --f-body:'Be Vietnam Pro',sans-serif; --f-mono:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.22,1,.36,1); --wrap:1020px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--f-body);background:var(--n-950);color:var(--n-200);line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3{font-family:var(--f-head);color:var(--white);font-weight:600;letter-spacing:-.015em;line-height:1.12;text-wrap:balance}
+b,strong{color:var(--white);font-weight:600}
+.veil{position:fixed;inset:0;z-index:-2;pointer-events:none;background:radial-gradient(120% 80% at 50% -10%,#16163e 0%,var(--n-900) 42%,var(--n-950) 100%)}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{max-width:var(--wrap);margin-inline:auto;padding-inline:clamp(22px,5vw,40px)}
+.eyebrow{font-family:var(--f-mono);font-size:12px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--o-300)}
+.rv{opacity:0;transform:translateY(14px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.rv.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.rv{opacity:1!important;transform:none!important}}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:rgba(7,7,24,.7);border-bottom:1px solid rgba(255,255,255,.06)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;padding-block:13px}
+.nav .brand{display:flex;align-items:center;gap:10px;font-family:var(--f-head);font-weight:600;color:#fff;font-size:16px}
+.nav .fc-s{width:30px;height:30px;border-radius:9px;background:linear-gradient(150deg,var(--o-400),var(--o-600));display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:13px}
+.nav a.dl{font-family:var(--f-body);font-weight:600;font-size:13.5px;color:#fff;text-decoration:none;padding:9px 18px;border-radius:9px;background:linear-gradient(150deg,var(--o-400),var(--o-600))}
+
+/* buttons */
+.cta-btn{display:inline-flex;align-items:center;gap:9px;font-family:var(--f-body);font-weight:600;font-size:16.5px;color:#fff;text-decoration:none;
+  padding:16px 32px;border-radius:13px;background:linear-gradient(150deg,var(--o-400),var(--o-600));
+  box-shadow:0 14px 32px -12px rgba(201,96,40,.7);transition:transform .2s var(--ease),box-shadow .2s}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:0 22px 44px -12px rgba(201,96,40,.85)}
+.ghost{font-family:var(--f-mono);font-size:13px;color:var(--n-300);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.18);padding-bottom:2px}
+.ghost:hover{color:var(--o-300)}
+.btn-row{display:flex;gap:16px;justify-content:center;align-items:center;flex-wrap:wrap}
+
+/* hero */
+.hero{text-align:center;padding:70px 0 40px}
+.hero .badge{display:inline-flex;align-items:center;gap:9px;font-family:var(--f-mono);font-size:12px;letter-spacing:.04em;
+  color:var(--o-300);background:rgba(201,96,40,.1);border:1px solid rgba(201,96,40,.28);border-radius:100px;padding:7px 16px;margin-bottom:26px}
+.hero .badge b{color:#fff;font-weight:600}
+.hero h1{font-size:clamp(40px,7.5vw,72px);font-weight:500;letter-spacing:-.025em;margin-bottom:20px}
+.hero h1 em{color:var(--o-400);font-style:italic;font-weight:600}
+.hero .lead{font-size:clamp(16px,2.1vw,20px);color:var(--n-200);max-width:600px;margin:0 auto 30px;line-height:1.6}
+.hero .lead b{color:var(--n-100);font-weight:500}
+.cta-sub{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.05em;color:var(--n-400);margin-top:18px}
+
+/* DEMO device */
+.demo-wrap{margin:46px auto 0;max-width:640px}
+.device{position:relative;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.1);
+  background:linear-gradient(135deg,#1a2440,#101728);box-shadow:0 40px 90px -40px #000,inset 0 1px 0 rgba(255,255,255,.05);aspect-ratio:16/10}
+.dev-bar{height:30px;display:flex;align-items:center;gap:7px;padding:0 14px;background:rgba(0,0,0,.25);border-bottom:1px solid rgba(255,255,255,.06)}
+.dev-bar i{width:10px;height:10px;border-radius:50%;display:block}
+.dev-bar i:nth-child(1){background:#E0775C}.dev-bar i:nth-child(2){background:#E8C060}.dev-bar i:nth-child(3){background:#5BC490}
+.dev-bar .lbl{margin-left:auto;font-family:var(--f-mono);font-size:10px;color:var(--n-400);letter-spacing:.08em}
+.stage{position:absolute;inset:30px 0 0 0}
+/* faux desktop content lines */
+.dk{position:absolute;left:8%;right:8%;height:8px;border-radius:4px;background:rgba(255,255,255,.08)}
+/* floating bar in demo */
+.d-fbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;align-items:center;padding:7px 9px;
+  border-radius:12px;background:linear-gradient(180deg,#161636,#0d0d24);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px -10px #000;
+  opacity:0;animation:dBar 15s var(--ease) infinite}
+.d-fbar .m{width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.07)}
+.d-fbar .m.act{background:rgba(201,96,40,.35);box-shadow:0 0 0 2px rgba(201,96,40,.5)}
+.d-fbar .fc{width:20px;height:20px;border-radius:6px;background:linear-gradient(150deg,var(--o-400),var(--o-600));font-family:var(--f-head);font-weight:700;color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center}
+/* selection rect */
+.d-sel{position:absolute;border:2px solid var(--o-400);background:rgba(201,96,40,.08);border-radius:3px;
+  left:22%;top:30%;width:0;height:0;opacity:0;animation:dSel 15s var(--ease) infinite}
+/* editor card */
+.d-ed{position:absolute;left:20%;top:24%;width:60%;border-radius:11px;overflow:hidden;border:1px solid rgba(255,255,255,.12);
+  background:#0e1426;box-shadow:0 20px 40px -16px #000;opacity:0;transform:scale(.96);animation:dEd 15s var(--ease) infinite}
+.d-ed .et{display:flex;gap:4px;padding:7px 9px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.07)}
+.d-ed .et b{width:16px;height:16px;border-radius:5px;background:rgba(255,255,255,.08)}
+.d-ed .et b.on{background:rgba(201,96,40,.4)}
+.d-ed .et .save{margin-left:auto;font-family:var(--f-mono);font-size:9px;color:#fff;background:var(--o-500);padding:3px 9px;border-radius:5px;align-self:center}
+.d-ed .ec{height:96px;position:relative;background:linear-gradient(135deg,#1d2740,#141b2e)}
+.d-arrow{position:absolute;inset:0;opacity:0;animation:dArrow 15s var(--ease) infinite}
+.d-hl{position:absolute;left:14%;top:30%;width:34%;height:15px;border-radius:3px;background:rgba(201,96,40,.34);opacity:0;animation:dHl 15s var(--ease) infinite}
+.d-toast{position:absolute;right:14px;bottom:14px;font-family:var(--f-mono);font-size:10px;color:#fff;background:rgba(42,122,80,.92);padding:6px 12px;border-radius:7px;opacity:0;animation:dToast 15s var(--ease) infinite}
+.d-cursor{position:absolute;width:14px;height:14px;left:30%;top:42%;opacity:0;animation:dCur 15s var(--ease) infinite;z-index:5}
+.demo-cap{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--n-400);text-align:center;margin-top:14px}
+
+@keyframes dBar{0%,3%{opacity:0;transform:translateX(-50%) translateY(-8px)}6%,92%{opacity:1;transform:translateX(-50%) translateY(0)}97%,100%{opacity:0}}
+@keyframes dSel{0%,12%{opacity:0;width:0;height:0}16%{opacity:1;width:0;height:0}38%{opacity:1;width:42%;height:40%}41%{opacity:1;width:42%;height:40%}44%,100%{opacity:0;width:42%;height:40%}}
+@keyframes dEd{0%,42%{opacity:0;transform:scale(.96)}47%{opacity:1;transform:scale(1)}90%{opacity:1;transform:scale(1)}95%,100%{opacity:0;transform:scale(.98)}}
+@keyframes dArrow{0%,50%{opacity:0}56%{opacity:1}90%{opacity:1}95%,100%{opacity:0}}
+@keyframes dHl{0%,58%{opacity:0}63%{opacity:1}90%{opacity:1}95%,100%{opacity:0}}
+@keyframes dToast{0%,78%{opacity:0;transform:translateY(6px)}82%{opacity:1;transform:translateY(0)}90%{opacity:1}94%,100%{opacity:0}}
+@keyframes dCur{0%,14%{opacity:0;left:30%;top:42%}17%{opacity:1;left:22%;top:30%}38%{opacity:1;left:64%;top:70%}46%{opacity:1;left:60%;top:40%}58%{opacity:1;left:40%;top:46%}66%{opacity:0;left:50%;top:50%}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.d-fbar,.d-ed{opacity:1!important;animation:none!important}.d-sel,.d-arrow,.d-hl,.d-toast,.d-cursor{animation:none!important}}
+
+/* metrics strip */
+.metrics{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(20px,5vw,56px);padding:30px 0;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+.metric{text-align:center}
+.metric .v{font-family:var(--f-head);font-size:clamp(26px,4vw,38px);font-weight:600;color:var(--o-400);line-height:1}
+.metric .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--n-400);margin-top:8px}
+
+/* sections */
+.sec{padding:clamp(50px,7vw,84px) 0}
+.sec-head{text-align:center;max-width:640px;margin:0 auto clamp(36px,4vw,52px)}
+.sec-head .eyebrow{margin-bottom:14px;display:inline-block}
+.sec-head h2{font-size:clamp(27px,4.2vw,42px);font-weight:500}
+.sec-head h2 em{color:var(--o-400);font-style:italic}
+.sec-head p{font-size:clamp(15px,1.9vw,18px);color:var(--n-300);margin-top:14px;line-height:1.7}
+.panel{background:linear-gradient(180deg,var(--n-800),var(--n-900));border:1px solid rgba(255,255,255,.08);border-radius:18px}
+
+/* problem */
+.prob{max-width:680px;margin:0 auto;text-align:center}
+.prob p{font-size:clamp(16px,2vw,19px);color:var(--n-200);line-height:1.7;margin-bottom:18px}
+.prob .quote{font-family:var(--f-head);font-style:italic;font-size:clamp(20px,2.8vw,26px);color:#fff;line-height:1.45;margin:30px auto 0;max-width:560px}
+.prob .quote span{color:var(--o-300)}
+
+/* maker */
+.maker{display:flex;align-items:center;gap:24px;max-width:680px;margin:0 auto;padding:clamp(24px,3vw,34px);flex-wrap:wrap;justify-content:center;text-align:left}
+.maker .av{width:74px;height:74px;border-radius:50%;flex-shrink:0;border:2px solid var(--o-500);background:radial-gradient(circle at 50% 35%,#2a3a6a,#12123a);display:flex;align-items:center;justify-content:center}
+.maker .av svg{width:40px;height:40px;color:var(--o-400)}
+.maker .mt{flex:1;min-width:240px}
+.maker .nm{font-family:var(--f-head);font-weight:600;color:#fff;font-size:18px}
+.maker .ro{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--o-300);margin:3px 0 10px}
+.maker .mq{font-size:14.5px;color:var(--n-200);line-height:1.65;font-style:italic}
+
+/* differentiators */
+.diff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.diff{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:15px;padding:26px;transition:all .3s var(--ease)}
+.diff:hover{border-color:rgba(201,96,40,.28);transform:translateY(-3px)}
+.diff .ic{width:44px;height:44px;border-radius:12px;background:rgba(201,96,40,.1);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.diff .ic svg{width:22px;height:22px;color:var(--o-400);stroke-width:1.7}
+.diff h3{font-size:18.5px;font-weight:600;margin-bottom:7px}
+.diff p{font-size:14px;color:var(--n-300);line-height:1.65}
+
+/* steps */
+.steps{counter-reset:s;display:grid;gap:14px;max-width:660px;margin:0 auto}
+.step{display:flex;gap:20px;align-items:center;background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.07);border-radius:15px;padding:20px 24px}
+.step::before{counter-increment:s;content:counter(s);font-family:var(--f-head);font-weight:600;font-size:20px;color:var(--o-400);
+  width:40px;height:40px;border-radius:11px;background:rgba(201,96,40,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step .st{font-size:16px;color:var(--n-100);font-weight:500}
+.step .sd{font-size:14px;color:var(--n-300);margin-top:2px}
+.step code{font-family:var(--f-mono);font-size:.9em;color:var(--o-300);background:rgba(201,96,40,.08);padding:1px 6px;border-radius:5px}
+
+/* comparison */
+.cmp{max-width:760px;margin:0 auto;border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden}
+.cmp table{width:100%;border-collapse:collapse;font-size:14px}
+.cmp th,.cmp td{padding:14px 12px;text-align:center;border-bottom:1px solid rgba(255,255,255,.06)}
+.cmp th:first-child,.cmp td:first-child{text-align:left;color:var(--n-200)}
+.cmp thead th{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--n-300);font-weight:500;background:rgba(255,255,255,.02)}
+.cmp thead th.us{color:var(--o-300)}
+.cmp td.us{background:rgba(201,96,40,.06);color:#fff;font-weight:500}
+.cmp .y{color:var(--green);font-weight:600}.cmp .n{color:var(--red)}.cmp .p{color:var(--n-400)}
+.cmp tr:last-child td{border-bottom:none}
+
+/* install + final */
+.install{max-width:660px;margin:0 auto}
+.note{font-family:var(--f-body);font-size:13.5px;color:var(--n-300);line-height:1.7;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:2px solid var(--o-500);border-radius:0 12px 12px 0;padding:16px 20px;margin-top:18px}
+.note b{color:var(--n-100)}
+.final{text-align:center;padding:clamp(38px,5vw,58px) clamp(22px,4vw,40px);background:radial-gradient(120% 130% at 50% 0%,rgba(201,96,40,.15),transparent 70%),var(--n-800);border:1px solid rgba(201,96,40,.22);border-radius:22px}
+.final .badge{display:inline-block;font-family:var(--f-mono);font-size:11.5px;color:var(--o-300);margin-bottom:14px;letter-spacing:.04em}
+.final h2{font-size:clamp(28px,4vw,42px);font-weight:500;margin-bottom:24px}
+.final h2 em{color:var(--o-400);font-style:italic}
+footer{padding:54px 0 70px;text-align:center;border-top:1px solid rgba(255,255,255,.07);margin-top:30px}
+footer .sig{font-family:var(--f-head);font-style:italic;font-size:18px;color:var(--white)}
+footer .sub{font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--n-400);margin-top:10px}
+.warn{font-family:var(--f-mono);font-size:11px;color:var(--n-400);text-align:center;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="veil"></div><div class="grain"></div>
+
+<!-- NAV -->
+<nav class="nav"><div class="wrap">
+  <div class="brand"><span class="fc-s">FC</span> FC-FastCapture</div>
+  <a class="dl" href="#tai">Tải miễn phí</a>
+</div></nav>
+
+<!-- HERO -->
+<header class="hero"><div class="wrap">
+  <div class="badge rv in">Quà tặng · <b>10X Life OS &amp; anh em build cùng AI</b></div>
+  <h1 class="rv in">Chụp, sửa, gửi —<br><em>ngay trên máy bạn.</em></h1>
+  <p class="lead rv in">Chụp màn hình + quay GIF, sửa thẳng trên ảnh. Chạy <b>100% trên máy</b>: không tài khoản, không quảng cáo, không thu phí, không giới hạn.</p>
+  <div class="btn-row rv in">
+    <a class="cta-btn" href="https://github.com/thanghuyenduc10x/fc-fastcapture/releases/download/v1.0/FC-FastCapture.dmg">↓ Tải app miễn phí</a>
+    <a class="ghost" href="#demo">Xem demo 15s</a>
+  </div>
+  <div class="cta-sub rv in">macOS Apple Silicon · .dmg ~58MB · <b style="color:var(--o-300)">Trị giá $39 — tặng riêng anh em, miễn phí trọn đời</b></div>
+
+  <!-- DEMO 15s (animated) -->
+  <div class="demo-wrap rv in" id="demo">
+    <div class="device">
+      <div class="dev-bar"><i></i><i></i><i></i><span class="lbl">demo · 15s</span></div>
+      <div class="stage">
+        <div class="dk" style="top:18px"></div>
+        <div class="dk" style="top:36px;right:24%"></div>
+        <div class="dk" style="top:64px;width:auto;left:8%;right:40%"></div>
+        <!-- floating bar -->
+        <div class="d-fbar"><span class="fc">FC</span><span class="m"></span><span class="m act"></span><span class="m"></span><span class="m"></span><span class="m"></span></div>
+        <!-- selection -->
+        <div class="d-sel"></div>
+        <!-- editor -->
+        <div class="d-ed">
+          <div class="et"><b></b><b class="on"></b><b></b><b></b><span class="save">Lưu</span></div>
+          <div class="ec">
+            <div class="d-hl"></div>
+            <svg class="d-arrow" viewBox="0 0 240 96" preserveAspectRatio="none"><path d="M180 22 Q 120 30 70 52" fill="none" stroke="#D97538" stroke-width="3" stroke-linecap="round"/><path d="M70 52 L82 46 M70 52 L78 60" fill="none" stroke="#D97538" stroke-width="3" stroke-linecap="round"/></svg>
+            <div class="d-toast">Đã lưu ✓</div>
+          </div>
+        </div>
+        <!-- cursor -->
+        <svg class="d-cursor" viewBox="0 0 24 24" fill="#fff" stroke="#0A0A24" stroke-width="1.5"><path d="M5 3 L19 12 L12 13 L9 20 Z"/></svg>
+      </div>
+    </div>
+    <div class="demo-cap">Bấm phím tắt → kéo chọn vùng → sửa trên ảnh → lưu</div>
+  </div>
+</div></header>
+
+<!-- METRICS -->
+<section><div class="wrap metrics rv">
+  <div class="metric"><div class="v">5</div><div class="k">chế độ chụp</div></div>
+  <div class="metric"><div class="v">0₫</div><div class="k">trọn đời</div></div>
+  <div class="metric"><div class="v">28/28</div><div class="k">kiểm thử đối kháng</div></div>
+  <div class="metric"><div class="v">100%</div><div class="k">chạy trên máy</div></div>
+</div></section>
+
+<!-- PROBLEM -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Vì sao có app này</span><h2>Một việc nhỏ, <em>không nên phiền tới thế</em></h2></div>
+  <div class="prob rv">
+    <p>Chụp màn hình mặc định của macOS: chụp xong là một file rơi ra desktop. Muốn vẽ một mũi tên, che một dòng, hay quay một đoạn GIF? <b>Không có.</b></p>
+    <p>Công cụ trả phí thì tốt — nhưng bắt bạn <b>trả $29–$60</b>, hoặc tạo tài khoản, hoặc gửi ảnh lên đám mây của họ chỉ để chụp một tấm hình.</p>
+    <div class="quote">Ảnh chụp của bạn là <span>của bạn.</span><br>Không gửi đi đâu. Không qua máy chủ của ai cả.</div>
+  </div>
+</div></section>
+
+<!-- MAKER -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="panel maker rv">
+    <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 18 L10.4 12.7 L12 12 L13.6 12.7 Z"/><path d="M12 6 L13.6 12 L12 12.6 L10.4 12 Z" fill="currentColor"/></svg></div>
+    <div class="mt">
+      <div class="nm">Thắng Huyền Đức</div>
+      <div class="ro">Mind Coach · 10X Life OS</div>
+      <div class="mq">"Mình build con app này cùng AI trong sáu tháng — vá 12 lỗi, audit 3 vòng, 28/28 kiểm thử đối kháng đạt. Không quảng cáo, không thu phí. Làm 1 lần cho đàng hoàng, rồi tặng anh em dùng mãi."</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- DIFFERENTIATORS -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Khác biệt</span><h2>Bốn điều khiến nó <em>đáng để bên cạnh</em></h2></div>
+  <div class="diff-grid">
+    <div class="diff rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L20 7 V12 C20 16.5 16.5 20 12 21 C7.5 20 4 16.5 4 12 V7 Z"/><path d="M9 12 L11 14 L15 10"/></svg></div><h3>Riêng tư tuyệt đối</h3><p>Chạy 100% trên máy. Không gửi một tấm ảnh nào đi đâu, không qua máy chủ ai cả.</p></div>
+    <div class="diff rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 L19 5 M19 5 H12 M19 5 V12"/></svg></div><h3>Sửa ngay trên ảnh</h3><p>Mũi tên, khung, bút dạ quang, làm mờ che thông tin, đánh số bước, chữ, màu — tại chỗ, không mở app khác.</p></div>
+    <div class="diff rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M10 9.5 L14.5 12 L10 14.5 Z" fill="currentColor"/></svg></div><h3>Quay GIF + click xuyên</h3><p>Quay vùng màn hình thành GIF — và vẫn thao tác được app bên dưới trong lúc quay.</p></div>
+    <div class="diff rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 14 V18 A1 1 0 0 0 6 19 H18 A1 1 0 0 0 19 18 V14"/><path d="M12 4 V14 M8 10 L12 14 L16 10"/></svg></div><h3>Miễn phí, không giới hạn</h3><p>Không tài khoản, không quảng cáo, không watermark, không bản dùng thử. Trọn đời.</p></div>
+  </div>
+</div></section>
+
+<!-- HOW IT WORKS -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">Dùng thế nào</span><h2>Ba bước, <em>quen tay là quên luôn</em></h2></div>
+  <div class="steps">
+    <div class="step rv"><div><div class="st">Bấm phím tắt</div><div class="sd"><code>⌘1</code>–<code>⌘5</code> cho 5 chế độ, hoặc click thanh nổi.</div></div></div>
+    <div class="step rv"><div><div class="st">Kéo chọn vùng</div><div class="sd">Kéo một hình chữ nhật — hoặc chọn cả cửa sổ. Thả là xong.</div></div></div>
+    <div class="step rv"><div><div class="st">Sửa &amp; Lưu</div><div class="sd">Vẽ trên ảnh ngay tại chỗ → <code>⌘C</code> vào clipboard hoặc lưu <code>.png</code>/<code>.gif</code>.</div></div></div>
+  </div>
+</div></section>
+
+<!-- COMPARISON -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="sec-head rv"><span class="eyebrow">So sánh</span><h2>Đặt cạnh nhau cho <em>dễ thấy</em></h2></div>
+  <div class="cmp rv">
+    <table>
+      <thead><tr><th></th><th>macOS mặc định</th><th>Công cụ trả phí</th><th class="us">FC-FastCapture</th></tr></thead>
+      <tbody>
+        <tr><td>Sửa ngay trên ảnh</td><td class="n">✗</td><td class="y">✓</td><td class="us y">✓</td></tr>
+        <tr><td>Quay GIF</td><td class="n">✗</td><td class="y">✓</td><td class="us y">✓</td></tr>
+        <tr><td>Phím tắt tuỳ chỉnh</td><td class="p">một phần</td><td class="y">✓</td><td class="us y">✓</td></tr>
+        <tr><td>Chạy offline, không gửi ảnh</td><td class="y">✓</td><td class="n">✗ (cloud)</td><td class="us y">✓</td></tr>
+        <tr><td>Cần tài khoản</td><td class="y">không</td><td class="n">có</td><td class="us y">không</td></tr>
+        <tr><td>Giá</td><td>0₫</td><td class="n">$29–$60</td><td class="us y">0₫ trọn đời</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<!-- DOWNLOAD -->
+<section class="sec" id="tai" style="padding-top:0"><div class="wrap install">
+  <div class="sec-head rv"><span class="eyebrow">Cài đặt</span><h2>Một phút là <em>chụp được</em></h2></div>
+  <div class="steps">
+    <div class="step rv"><div><div class="st">Tải &amp; mở file <code>.dmg</code></div><div class="sd">Kéo FC-FastCapture vào thư mục Applications.</div></div></div>
+    <div class="step rv"><div><div class="st">Mở lần đầu: chuột phải → Open</div><div class="sd">App chưa ký Apple nên lần đầu cần <code>chuột phải</code> → <code>Open</code> → xác nhận.</div></div></div>
+    <div class="step rv"><div><div class="st">Cấp 2 quyền → khởi động lại</div><div class="sd">Bật <b style="color:var(--n-100)">Screen Recording</b> + <b style="color:var(--n-100)">Accessibility</b> trong cửa sổ "Cấp quyền" → bấm khởi động lại. Xong.</div></div></div>
+  </div>
+  <div class="note rv"><b>Vì sao có 2 quyền?</b> Screen Recording để chụp ra <b>nội dung thật</b> (không phải hình nền); Accessibility để <b>phím tắt toàn cục</b> chạy. App không thu thập, không gửi dữ liệu đi đâu — quyền chỉ dùng tại chỗ.</div>
+</div></section>
+
+<!-- FINAL CTA -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="final rv">
+    <div class="badge">Quà tặng · Trị giá $39 · Miễn phí trọn đời</div>
+    <h2>Nhận app ngay — <em>Miễn phí</em></h2>
+    <div class="btn-row">
+      <a class="cta-btn" href="https://github.com/thanghuyenduc10x/fc-fastcapture/releases/download/v1.0/FC-FastCapture.dmg">↓ Tải FC-FastCapture cho macOS</a>
+    </div>
+    <div class="cta-sub">Apple Silicon (M1–M4) · .dmg ~58MB · không quảng cáo, không thu phí</div>
+    <div class="warn">Bản Mac Intel &amp; Windows đang trên đường — cùng một lõi.</div>
+  </div>
+</div></section>
+
+<footer><div class="wrap rv">
+  <div class="sig">Làm 1 lần cho đàng hoàng. Tặng anh em dùng mãi.</div>
+  <div class="sub">Dev by Thắng Huyền Đức · 10X-LifeOS.Com</div>
+</div></footer>
+
+<script>
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.1,rootMargin:'0px 0px -6% 0px'});
+  document.querySelectorAll('.rv:not(.in)').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
