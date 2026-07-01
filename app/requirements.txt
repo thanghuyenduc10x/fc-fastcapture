@@ -1,0 +1,14 @@
+# FC-FastCapture — Python deps (macOS Apple Silicon/Intel + Windows).
+# Cross-platform core:
+PyQt6>=6.6
+mss>=9.0
+Pillow>=10.0
+imageio>=2.31
+imageio-ffmpeg>=0.4.9
+numpy>=1.24,<2.1            # <2.1 keeps Python 3.9 wheels available
+# macOS-only (pyobjc). The environment markers make pip SKIP these on Windows,
+# so the same file works for the Windows build. The Windows platform layer
+# (hotkeys_win.py / winshot.py) uses pure ctypes — no extra deps needed.
+pyobjc-framework-Quartz>=10.0 ; sys_platform == 'darwin'
+pyobjc-framework-Cocoa>=10.0 ; sys_platform == 'darwin'
+pyobjc-framework-ApplicationServices>=10.0 ; sys_platform == 'darwin'
