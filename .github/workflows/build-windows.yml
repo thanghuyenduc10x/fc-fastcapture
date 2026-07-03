@@ -82,8 +82,8 @@ jobs:
           name: FC-FastCapture-Windows
           path: app/dist/FC-FastCapture-Windows.exe
 
-      - name: Attach to v1.0 release
+      - name: Attach to v1.1 release
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload v1.0 "dist/FC-FastCapture-Windows.exe" --clobber
+        run: gh release upload v1.1 "dist/FC-FastCapture-Windows.exe" --clobber

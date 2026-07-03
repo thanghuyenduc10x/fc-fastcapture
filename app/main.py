@@ -451,6 +451,9 @@ class Controller(QtCore.QObject):
         self.perm_win = None
 
         self._bar_was_visible = False
+        self._in_capture = False   # _begin/_end_capture idempotency
+        self._frozen = None        # freeze-first: per-screen frozen pixmaps
+        self._freezing = False     # freeze in-flight (overlay not built yet)
         self._combos = {}          # name -> (frozenset(mods), keycode)
         self._tap = None           # Quartz CGEventTap (global hotkeys)
         self._tap_src = None
@@ -643,7 +646,11 @@ class Controller(QtCore.QObject):
     def _suspend_tap(self):
         """Temporarily disable global hotkeys (e.g. while recording a new one in
         Settings) so the keystrokes reach the recorder instead of being consumed
-        and triggering a capture."""
+        and triggering a capture. REFCOUNTED: nested suspenders (Settings open
+        + Mode 3's size dialog) don't re-enable each other's suspension."""
+        self._tap_susp = getattr(self, "_tap_susp", 0) + 1
+        if self._tap_susp > 1:
+            return   # already suspended by an outer caller
         if platform_backend.IS_WIN:
             if getattr(self, "_winhk", None) is not None:
                 self._winhk.suspend()
@@ -651,6 +658,9 @@ class Controller(QtCore.QObject):
         self._stop_event_tap()
 
     def _resume_tap(self):
+        self._tap_susp = max(0, getattr(self, "_tap_susp", 0) - 1)
+        if self._tap_susp > 0:
+            return   # an outer suspender is still active
         if platform_backend.IS_WIN:
             if getattr(self, "_winhk", None) is not None:
                 self._winhk.resume()
@@ -676,6 +686,14 @@ class Controller(QtCore.QObject):
         + StopButton/RecordingFrame, leaving the screen being recorded forever)."""
         if self.overlay is not None:
             return True
+        if getattr(self, "_freezing", False):
+            # A freeze-first capture is mid-flight (overlay not built yet).
+            return True
+        if getattr(self, "_in_capture", False):
+            # Covers the whole begin→end window — incl. Mode 3's nested size
+            # dialog, where overlay is None but a capture IS in progress (the
+            # tray menu stays clickable during the dialog's event loop).
+            return True
         if self.recorder is not None or self.stopbtn is not None:
             return True
         if self.editor is not None and self.editor.isVisible():
@@ -686,22 +704,81 @@ class Controller(QtCore.QObject):
         return False
 
     def _begin_capture(self):
+        # Idempotent — mode 3 calls this before its size dialog AND again via
+        # the freeze helper; only the FIRST call may sample bar visibility, or
+        # the restore flag would be clobbered to False.
+        if getattr(self, "_in_capture", False):
+            return
+        self._in_capture = True
         self._bar_was_visible = bool(self.bar and self.bar.isVisible())
         if self.bar:
             self.bar.hide()
 
     def _end_capture(self):
+        self._in_capture = False
         if self._bar_was_visible and self.bar:
             self.bar.show_bar()
 
     def _cancel(self):
         self.overlay = None
+        self._frozen = None       # release the frozen screen pixmaps
+        self._freezing = False
         self._end_capture()
 
+    # ── FREEZE-FIRST (v1.1) ──────────────────────────────────────────────
+    # Hotkey → our UI hides → every screen is snapshotted THAT instant → the
+    # overlay opens showing the FROZEN image → the user selects at leisure →
+    # the shot is CROPPED from the frozen pixels (instant, no re-grab).
+    # Fixes both the "missed the moment while dragging" UX and the Windows
+    # DPI offset bug (crop is per-screen local + explicit scale; the legacy
+    # global-logical-rect → mss path was wrong under 125-150% scaling).
+    def _start_frozen_overlay(self, build_overlay):
+        """build_overlay(frozen_list) must return a started-ready overlay with
+        .selected already connected. Freeze failure → live overlay (legacy)."""
+        self._begin_capture()
+        self._freezing = True
+        def go():
+            self._freezing = False
+            try:
+                self._frozen = capture.freeze_screens()
+            except Exception:
+                self._frozen = None
+            if not self._frozen:
+                log("⚠ Freeze thất bại — overlay chạy chế độ live (fallback).")
+            try:
+                self.overlay = build_overlay(self._frozen)
+            except Exception as e:
+                log("✕ Không mở được overlay: %s" % e)
+                self._cancel()
+                return
+            self.overlay.cancelled.connect(self._cancel)
+            self.overlay.start()
+        # One breath (60ms) so the floating bar/dialog is truly gone from the
+        # screen before we freeze — imperceptible, keeps our UI out of the shot.
+        QTimer.singleShot(60, go)
+
     def _grab(self, rect, handler):
+        # Freeze-first: crop from the frozen snapshot — instant, DPI-proof.
+        frozen = getattr(self, "_frozen", None)
+        if frozen:
+            shot = None
+            try:
+                shot = capture.crop_from_frozen(frozen, rect)
+            except Exception:
+                shot = None
+            self._frozen = None   # release pixmaps immediately
+            if shot is not None:
+                if self.overlay:
+                    self.overlay.close()
+                if shot.rect[2] < 4 or shot.rect[3] < 4:
+                    self._cancel()
+                    return
+                handler(shot)
+                return
+            log("⚠ Crop từ ảnh freeze thất bại — chụp live (fallback).")
         if self.overlay:
             self.overlay.close()
-        # let the overlay fully disappear before grabbing so it never shows up
+        # legacy live path: let the overlay fully disappear before grabbing
         QTimer.singleShot(140, lambda: self._do_grab(rect, handler))
 
     def _do_grab(self, rect, handler):
@@ -710,7 +787,9 @@ class Controller(QtCore.QObject):
             self._cancel()
             return
         try:
-            shot = capture.capture_region(x, y, w, h)
+            # DPI-mapped live grab (Windows: logical→physical; macOS: as-is) —
+            # without it this fallback would reintroduce the 125% offset bug.
+            shot = capture.capture_region_dpi(x, y, w, h)
         except Exception as e:
             log("✕ Lỗi chụp: %s" % e)
             self._cancel()   # clears self.overlay too — else busy-guard sticks
@@ -721,11 +800,11 @@ class Controller(QtCore.QObject):
     def mode1(self):
         if self._capture_busy():
             return
-        self._begin_capture()
-        self.overlay = SelectionOverlay(mode="free")
-        self.overlay.selected.connect(lambda r: self._grab(r, self._after_mode1))
-        self.overlay.cancelled.connect(self._cancel)
-        self.overlay.start()
+        def build(frozen):
+            ov = SelectionOverlay(mode="free", frozen=frozen)
+            ov.selected.connect(lambda r: self._grab(r, self._after_mode1))
+            return ov
+        self._start_frozen_overlay(build)
 
     def _after_mode1(self, shot):
         try:
@@ -743,16 +822,18 @@ class Controller(QtCore.QObject):
     def mode2(self):
         if self._capture_busy():
             return
-        self._begin_capture()
-        if self.cfg.remember_size_enabled():
-            w, h = self.cfg.remembered_size()
-            self.overlay = SelectionOverlay(mode="preset", initial_size=(w, h))
-        else:
-            self.overlay = SelectionOverlay(mode="free")
-        self.overlay.selected.connect(
-            lambda r: self._grab(r, lambda s: self._edit(s, "MODE 2", "MODE 2")))
-        self.overlay.cancelled.connect(self._cancel)
-        self.overlay.start()
+        def build(frozen):
+            if self.cfg.remember_size_enabled():
+                w, h = self.cfg.remembered_size()
+                ov = SelectionOverlay(mode="preset", initial_size=(w, h),
+                                      frozen=frozen)
+            else:
+                ov = SelectionOverlay(mode="free", frozen=frozen)
+            ov.selected.connect(
+                lambda r: self._grab(r, lambda s: self._edit(s, "MODE 2",
+                                                             "MODE 2")))
+            return ov
+        self._start_frozen_overlay(build)
 
     def mode3(self):
         if self._capture_busy():
@@ -777,36 +858,47 @@ class Controller(QtCore.QObject):
         self.cfg.data["locked_width"] = w
         self.cfg.data["locked_height"] = h
         self.cfg.save()
-        self.overlay = SelectionOverlay(mode="preset", initial_size=(w, h),
-                                        fixed_size=True)
         ctx = "MODE 3 · %dx%d" % (w, h)
-        self.overlay.selected.connect(
-            lambda r: self._grab(r, lambda s: self._edit(s, "MODE 3", ctx)))
-        self.overlay.cancelled.connect(self._cancel)
-        self.overlay.start()
+        def build(frozen):
+            ov = SelectionOverlay(mode="preset", initial_size=(w, h),
+                                  fixed_size=True, frozen=frozen)
+            ov.selected.connect(
+                lambda r: self._grab(r, lambda s: self._edit(s, "MODE 3", ctx)))
+            return ov
+        # Freeze AFTER the size dialog closed (60ms in the helper lets it
+        # vanish from screen) so the dialog never appears in the snapshot.
+        self._start_frozen_overlay(build)
 
     def mode4(self):
         if self._capture_busy():
             return
-        self._begin_capture()
         wins = []
         try:
             wins = windows.list_windows()
         except Exception:
             wins = []
-        self.overlay = SelectionOverlay(mode="window", windows=wins)
-        self.overlay.selected.connect(self._grab_window)
-        self.overlay.cancelled.connect(self._cancel)
-        self.overlay.start()
+        def build(frozen):
+            ov = SelectionOverlay(mode="window", windows=wins, frozen=frozen)
+            ov.selected.connect(self._grab_window)
+            return ov
+        self._start_frozen_overlay(build)
 
     def _grab_window(self, rect):
         # Read the picked window (has the CGWindow id) BEFORE closing the overlay.
         win = getattr(self.overlay, "picked_window", None) if self.overlay else None
+        frozen = getattr(self, "_frozen", None)
+        self._frozen = None
         if self.overlay:
             self.overlay.close()
-        QTimer.singleShot(140, lambda: self._do_grab_window(rect, win))
+        if frozen:
+            # Freeze-first: no need to wait for the overlay to vanish — the
+            # fallback crop reads the snapshot, not the live screen.
+            self._do_grab_window(rect, win, frozen)
+        else:
+            QTimer.singleShot(140,
+                              lambda: self._do_grab_window(rect, win, None))
 
-    def _do_grab_window(self, rect, win):
+    def _do_grab_window(self, rect, win, frozen=None):
         x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
         if w < 4 or h < 4:
             self._cancel()
@@ -823,13 +915,27 @@ class Controller(QtCore.QObject):
                 shot = capture.capture_window(wid, w, h, (x, y, w, h))
             except Exception:
                 shot = None
-        if shot is None or shot.image is None:
+        if (shot is None or shot.image is None) and frozen:
+            # Fallback #2: crop the window's rect from the frozen snapshot —
+            # DPI-proof on Windows (the live region grab below is not).
             try:
-                shot = capture.capture_region(x, y, w, h)
-            except Exception as e:
-                log("✕ Lỗi chụp: %s" % e)
-                self._cancel()   # clears self.overlay too — else busy-guard sticks
-                return
+                shot = capture.crop_from_frozen(frozen, rect)
+            except Exception:
+                shot = None
+        if shot is None or shot.image is None:
+            # Final fallback: DPI-mapped LIVE grab. On the frozen path we got
+            # here ~0ms after the overlay closed — wait for the compositor to
+            # actually remove it or the overlay ends up in the shot.
+            def _live():
+                try:
+                    s2 = capture.capture_region_dpi(x, y, w, h)
+                except Exception as e:
+                    log("✕ Lỗi chụp: %s" % e)
+                    self._cancel()
+                    return
+                self._edit(s2, "MODE 4", "MODE 4 · Chụp cửa sổ")
+            QTimer.singleShot(140 if frozen else 0, _live)
+            return
         self._edit(shot, "MODE 4", "MODE 4 · Chụp cửa sổ")
 
     def _edit(self, shot, mode_label, log_ctx):
@@ -886,8 +992,16 @@ class Controller(QtCore.QObject):
             self._cancel()
             return
         log("● Đang quay...")
+        # Windows DPI fix: the recorder feeds mss, which speaks PHYSICAL pixels
+        # there — convert the logical selection once, on the main thread. On
+        # macOS this is an identity mapping (mss speaks logical points).
         try:
-            self.recorder = GifRecorder(x, y, w, h, fps=self.cfg.get("gif_fps", 15))
+            gx, gy, gw, gh, _dpr = capture.logical_rect_to_physical(x, y, w, h)
+        except Exception:
+            gx, gy, gw, gh = x, y, w, h
+        try:
+            self.recorder = GifRecorder(gx, gy, gw, gh,
+                                        fps=self.cfg.get("gif_fps", 15))
         except Exception as e:
             log("✕ Không khởi tạo được recorder: %s" % e)
             self._end_capture()

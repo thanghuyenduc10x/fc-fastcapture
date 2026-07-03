@@ -46,10 +46,15 @@ class SelectionOverlay(QtWidgets.QWidget):
     cancelled = pyqtSignal()       # user pressed ESC / aborted
 
     def __init__(self, mode="free", locked_size=None, initial_size=None,
-                 windows=None, parent=None, screen=None, fixed_size=False):
+                 windows=None, parent=None, screen=None, fixed_size=False,
+                 frozen=None):
         super().__init__(parent)
         # Which screen this overlay covers (None → the screen under the cursor).
         self._screen = screen
+        # frozen: QPixmap snapshot of THIS screen taken the instant the hotkey
+        # fired (freeze-first flow). Painted as the backdrop so the user selects
+        # on a frozen image; None → classic live overlay (dim over live screen).
+        self._frozen = frozen
         # fixed_size: preset frame that can only be MOVED, never resized — used by
         # Mode 3 so the capture is always EXACTLY the configured W×H.
         self._fixed_size = bool(fixed_size)
@@ -600,6 +605,15 @@ class SelectionOverlay(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.RenderHint.TextAntialiasing, True)
 
         full = self.rect()
+        # Freeze-first: draw the frozen snapshot of this screen as the backdrop
+        # (its devicePixelRatio is set, so it paints at logical size). The dim
+        # veil + the bright selection "hole" then reveal the FROZEN pixels.
+        if self._frozen is not None:
+            try:
+                if not self._frozen.isNull():
+                    painter.drawPixmap(0, 0, self._frozen)
+            except Exception:
+                pass
         dim = theme.qcolor(theme.OVERLAY_DIM)
 
         sel = self._current_rect()
@@ -715,11 +729,19 @@ class MultiScreenOverlay(QtCore.QObject):
     cancelled = pyqtSignal()
 
     def __init__(self, mode="free", locked_size=None, initial_size=None,
-                 windows=None, parent=None, fixed_size=False):
+                 windows=None, parent=None, fixed_size=False, frozen=None):
         super().__init__(parent)
         self._overlays = []
         self._done = False
         self.picked_window = None     # set on selection in Mode 4
+        # frozen: list of capture.freeze_screens() entries — matched to each
+        # screen's overlay so every display shows ITS OWN frozen snapshot.
+        frozen_by_screen = {}
+        try:
+            for f in (frozen or []):
+                frozen_by_screen[f["screen"]] = f["pixmap"]
+        except Exception:
+            frozen_by_screen = {}
         try:
             screens = list(QtGui.QGuiApplication.screens())
         except Exception:
@@ -730,7 +752,8 @@ class MultiScreenOverlay(QtCore.QObject):
             try:
                 ov = SelectionOverlay(mode=mode, locked_size=locked_size,
                                       initial_size=initial_size, windows=windows,
-                                      screen=sc, fixed_size=fixed_size)
+                                      screen=sc, fixed_size=fixed_size,
+                                      frozen=frozen_by_screen.get(sc))
                 ov.selected.connect(
                     lambda r, o=ov: self._on_selected(r, o))
                 ov.cancelled.connect(self._on_cancelled)
@@ -787,9 +810,12 @@ class MultiScreenOverlay(QtCore.QObject):
     def _close_all(self):
         for ov in self._overlays:
             try:
+                ov._frozen = None      # release the frozen screen pixmap NOW
                 ov.close()
+                ov.deleteLater()       # break lambda ref-cycles → real teardown
             except Exception:
                 pass
+        self._overlays = []
 
     def close(self):
         self._close_all()

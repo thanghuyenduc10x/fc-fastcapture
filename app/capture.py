@@ -142,11 +142,12 @@ def capture_window(window_id, logical_w=None, logical_h=None,
                     return shot
             except Exception:
                 pass
-            # winshot unavailable / PrintWindow failed → live region grab.
-            if rect:
-                return capture_region(rect[0], rect[1], rect[2], rect[3])
-            return Shot(_blank_image(logical_w or 100, logical_h or 100),
-                        (0, 0, logical_w or 100, logical_h or 100), 1.0)
+            # winshot unavailable / PrintWindow failed → signal failure so the
+            # CALLER's fallback chain runs (frozen crop first — DPI-proof —
+            # then a properly delayed, DPI-mapped live grab). An internal live
+            # capture_region here would feed mss a LOGICAL rect (offset ~25%
+            # on 125%-scaled Windows) and mask the caller's better fallbacks.
+            return None
     except Exception:
         pass
     try:
@@ -178,11 +179,10 @@ def capture_window(window_id, logical_w=None, logical_h=None,
         rx, ry = (rect[0], rect[1]) if rect else (0, 0)
         return Shot(img, (rx, ry, lw, lh), scale)
     except Exception:
-        # Fall back to a plain region grab of the window's rect.
-        if rect:
-            return capture_region(rect[0], rect[1], rect[2], rect[3])
-        return Shot(_blank_image(logical_w or 100, logical_h or 100),
-                    (0, 0, logical_w or 100, logical_h or 100), 1.0)
+        # Quartz failed → return None; the caller owns the fallback chain
+        # (frozen crop → delayed live grab), which avoids grabbing the live
+        # screen zero milliseconds after the overlay closed.
+        return None
 
 
 def capture_full():
@@ -375,3 +375,233 @@ def save_pil(pil_img, path):
         return path
     except Exception:
         return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FREEZE-FIRST capture (v1.1) — the screen is snapshotted the INSTANT the
+# hotkey fires; the user then selects a region ON the frozen image and we CROP
+# from it. Two wins:
+#   1. Timing — fleeting moments (a face in a Zoom call) can't be missed while
+#      dragging a selection: the pixels are already frozen.
+#   2. Correctness — cropping happens in per-screen LOCAL coordinates with an
+#      explicit per-screen scale, which sidesteps the Windows DPI bug where a
+#      LOGICAL global rect was fed to mss (which speaks PHYSICAL pixels on
+#      Windows → the captured region was offset/scaled versus the selection).
+# Every function degrades gracefully: callers fall back to the legacy live
+# capture path when anything here returns None/{}.
+# ─────────────────────────────────────────────────────────────────────────────
+def qimage_to_pil(qimg):
+    """QImage → PIL RGB image (stride-safe). Returns None on failure."""
+    try:
+        from PyQt6 import QtGui
+        from PIL import Image
+        img = qimg.convertToFormat(QtGui.QImage.Format.Format_RGBA8888)
+        w, h = img.width(), img.height()
+        if w < 1 or h < 1:
+            return None
+        ptr = img.constBits()
+        ptr.setsize(img.sizeInBytes())
+        return Image.frombuffer("RGBA", (w, h), bytes(ptr), "raw", "RGBA",
+                                img.bytesPerLine(), 1).convert("RGB")
+    except Exception:
+        return None
+
+
+def freeze_screens():
+    """Snapshot EVERY screen right now → list of per-screen frozen entries.
+
+    Each entry is a dict:
+        {"screen": QScreen, "pixmap": QPixmap (physical px, DPR set),
+         "geo": QRect (logical global), "scale": float (physical/logical)}
+    The pixmap's devicePixelRatio is set so drawing it at (0,0) in a widget
+    that covers the screen paints it at exactly logical size (crisp on retina).
+    Returns [] if nothing could be captured (caller falls back to live grabs).
+    """
+    frozen = []
+    # macOS: without Screen Recording permission, grabWindow silently returns
+    # wallpaper-only pixmaps (NOT null) — the freeze would "work" but show an
+    # empty desktop. Bail to the live path, where the permission flow guides.
+    try:
+        import platform_backend
+        if platform_backend.IS_MAC:
+            screen_ok, _ = platform_backend.check_permissions()
+            if not screen_ok:
+                return []
+    except Exception:
+        pass
+    try:
+        from PyQt6 import QtGui
+        screens = list(QtGui.QGuiApplication.screens())
+    except Exception:
+        return []
+    for sc in screens:
+        try:
+            geo = sc.geometry()  # logical global
+            if geo.width() < 1 or geo.height() < 1:
+                continue
+            pm = sc.grabWindow(0)  # this screen's content, physical pixels
+            if pm is None or pm.isNull() or pm.width() < 1:
+                continue
+            scale = float(pm.width()) / float(geo.width())
+            if scale < 1.0:
+                scale = 1.0
+            try:
+                pm.setDevicePixelRatio(scale)
+            except Exception:
+                pass
+            frozen.append({"screen": sc, "pixmap": pm, "geo": geo,
+                           "scale": scale})
+        except Exception:
+            continue
+    return frozen
+
+
+def crop_from_frozen(frozen, qrect):
+    """Crop a GLOBAL logical QRect out of the frozen snapshot → Shot or None.
+
+    Finds the frozen screen containing the selection (selections are per-screen
+    — each overlay clamps to its own display), converts to screen-LOCAL logical
+    coords, scales by that screen's ratio and crops PHYSICAL pixels. No global
+    coordinate system ever touches the OS capture APIs → DPI-proof.
+    """
+    try:
+        if not frozen or qrect is None or qrect.width() < 1:
+            return None
+        cx, cy = qrect.center().x(), qrect.center().y()
+        entry = None
+        for f in frozen:
+            if f["geo"].contains(cx, cy):
+                entry = f
+                break
+        if entry is None:  # center off every screen → best overlap
+            best, area = None, -1
+            for f in frozen:
+                inter = f["geo"].intersected(qrect)
+                a = max(0, inter.width()) * max(0, inter.height())
+                if a > area:
+                    best, area = f, a
+            entry = best
+        if entry is None:
+            return None
+        geo, pm, scale = entry["geo"], entry["pixmap"], entry["scale"]
+        clamped = qrect.intersected(geo)
+        if clamped.width() < 1 or clamped.height() < 1:
+            return None
+        lx = clamped.x() - geo.x()
+        ly = clamped.y() - geo.y()
+        px = int(round(lx * scale))
+        py = int(round(ly * scale))
+        pw = int(round(clamped.width() * scale))
+        ph = int(round(clamped.height() * scale))
+        # Clamp to the pixmap's physical bounds.
+        px = max(0, min(px, pm.width() - 1))
+        py = max(0, min(py, pm.height() - 1))
+        pw = max(1, min(pw, pm.width() - px))
+        ph = max(1, min(ph, pm.height() - py))
+        from PyQt6.QtCore import QRect as _QRect
+        sub = pm.copy(_QRect(px, py, pw, ph))
+        img = qimage_to_pil(sub.toImage())
+        if img is None:
+            return None
+        return Shot(img, (clamped.x(), clamped.y(),
+                          clamped.width(), clamped.height()), scale)
+    except Exception:
+        return None
+
+
+def capture_region_dpi(x, y, w, h):
+    """capture_region with the Windows DPI mapping applied.
+
+    Takes a LOGICAL global rect, grabs the matching PHYSICAL pixels, and
+    returns a Shot whose .rect stays LOGICAL with .scale carrying the DPR —
+    exactly what the editor expects. On macOS this is capture_region verbatim.
+    Used by the LIVE fallback paths (freeze failed / frozen crop failed).
+    """
+    try:
+        px, py, pw, ph, dpr = logical_rect_to_physical(x, y, w, h)
+    except Exception:
+        px, py, pw, ph, dpr = x, y, w, h, 1.0
+    shot = capture_region(px, py, pw, ph)
+    if dpr and dpr > 1.0:
+        try:
+            return Shot(shot.image, (int(x), int(y), int(w), int(h)),
+                        max(shot.scale, float(dpr)))
+        except Exception:
+            pass
+    return shot
+
+
+def logical_rect_to_physical(x, y, w, h):
+    """Map a LOGICAL global rect to the PHYSICAL-pixel rect mss expects.
+
+    macOS: identity — mss speaks logical points there (current behaviour).
+    Windows: Qt speaks logical (scaled) coordinates while mss speaks physical
+    pixels, so a 125%-scaled laptop (the Asus Vivobook case) offsets every
+    grab by 25%. We match the Qt screen containing the rect to its mss monitor
+    (physical) and rebuild the rect: mon_origin + local_logical × DPR.
+    Returns (x, y, w, h[, scale]) — a 5th element carries the applied scale.
+    Falls back to identity (scale 1.0) whenever matching is ambiguous.
+    """
+    try:
+        import platform_backend
+        if not platform_backend.IS_WIN:
+            return (int(x), int(y), int(w), int(h), 1.0)
+    except Exception:
+        return (int(x), int(y), int(w), int(h), 1.0)
+    try:
+        from PyQt6 import QtGui
+        from PyQt6.QtCore import QRect as _QRect, QPoint as _QPoint
+        rect = _QRect(int(x), int(y), int(w), int(h))
+        sc = QtGui.QGuiApplication.screenAt(rect.center())
+        if sc is None:
+            sc = QtGui.QGuiApplication.primaryScreen()
+        if sc is None:
+            return (int(x), int(y), int(w), int(h), 1.0)
+        geo = sc.geometry()
+        dpr = float(sc.devicePixelRatio() or 1.0)
+        # Find the mss monitor whose physical size matches this screen.
+        import mss
+        with mss.mss() as sct:
+            mons = sct.monitors[1:]  # [0] is the union
+            pw = int(round(geo.width() * dpr))
+            ph = int(round(geo.height() * dpr))
+            matches = [m for m in mons
+                       if abs(m["width"] - pw) <= 2 and abs(m["height"] - ph) <= 2]
+            if len(matches) == 1:
+                mon = matches[0]
+            elif len(mons) == 1:
+                # Single monitor (the Vivobook case) — trivially unambiguous.
+                mon = mons[0]
+            elif len(matches) > 1:
+                # Two+ identical monitors: same physical size ⇒ same DPR ⇒
+                # matching Qt screens share logical size too. Left-to-right /
+                # top-to-bottom ORDER is preserved between Qt screens and mss
+                # monitors, so rank our screen among its same-size Qt siblings
+                # and pick the same rank among the size-matched mss monitors.
+                qt_same = [s for s in QtGui.QGuiApplication.screens()
+                           if abs(int(round(s.geometry().width()
+                                            * float(s.devicePixelRatio() or 1)))
+                                  - pw) <= 2
+                           and abs(int(round(s.geometry().height()
+                                             * float(s.devicePixelRatio() or 1)))
+                                   - ph) <= 2]
+                qt_same.sort(key=lambda s: (s.geometry().x(), s.geometry().y()))
+                matches.sort(key=lambda m: (m["left"], m["top"]))
+                try:
+                    idx = qt_same.index(sc)
+                except ValueError:
+                    return (int(x), int(y), int(w), int(h), 1.0)
+                if idx >= len(matches):
+                    return (int(x), int(y), int(w), int(h), 1.0)
+                mon = matches[idx]
+            else:
+                return (int(x), int(y), int(w), int(h), 1.0)
+            lx = rect.x() - geo.x()
+            ly = rect.y() - geo.y()
+            return (int(mon["left"] + round(lx * dpr)),
+                    int(mon["top"] + round(ly * dpr)),
+                    max(1, int(round(rect.width() * dpr))),
+                    max(1, int(round(rect.height() * dpr))),
+                    dpr)
+    except Exception:
+        return (int(x), int(y), int(w), int(h), 1.0)
