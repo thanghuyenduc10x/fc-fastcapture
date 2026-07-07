@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-x86/
+
+# Build artifacts (PyInstaller) — dựng lại được bằng build.sh / build-intel.sh
+app/build/
+app/build-intel/
+app/dist/
+app/dist-intel/
+
+# Archive trùng lặp & ảnh chụp thử nghiệm cá nhân
+*.zip
+Lưu/
+
+# Claude Code — cài đặt cục bộ máy này
+.claude/settings.local.json
