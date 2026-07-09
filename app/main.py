@@ -465,9 +465,13 @@ class Controller(QtCore.QObject):
     # ── menu bar ─────────────────────────────────────────────────────────
     def _build_tray(self):
         self.tray = QtWidgets.QSystemTrayIcon(make_tray_icon(), self.app)
-        self.tray.setToolTip("FC-FastCapture · 10XLifeOS")
+        self.tray.setToolTip("FC-FastCapture v%s · 10XLifeOS" % theme.APP_VERSION)
         menu = QtWidgets.QMenu()
         menu.setStyleSheet(theme.app_qss())
+        # Version header (disabled) so users can see which build they're on.
+        _hdr = menu.addAction("FC-FastCapture  v%s" % theme.APP_VERSION)
+        _hdr.setEnabled(False)
+        menu.addSeparator()
 
         # Map QAction → hotkey config-name so labels can be refreshed live
         # (e.g. right after the user changes a hotkey in Settings).
@@ -604,6 +608,22 @@ class Controller(QtCore.QObject):
                 for tok, mask in FLAG.items():
                     if flags & mask:
                         mods.add(tok)
+                # MENU-BAR MODE: an Accessory app's overlay/editor can't be
+                # the key window, so keyPressEvent(ESC/Enter) never fires.
+                # Forward them through the tap instead (no key window needed).
+                if platform_backend.MENUBAR_MODE and not mods:
+                    if self.overlay is not None:
+                        if keycode == 53:      # ESC → cancel selection
+                            QTimer.singleShot(0, self._overlay_cancel_fs)
+                            return None
+                        if keycode == 36:      # Return → confirm selection
+                            QTimer.singleShot(0, self._overlay_confirm_fs)
+                            return None
+                    elif keycode == 53 and self._editor_should_take_esc():
+                        # ESC closes the editor — UNLESS an inline text field is
+                        # open (then ESC belongs to that field, handled by Qt).
+                        QTimer.singleShot(0, self._editor_cancel_fs)
+                        return None
                 for nm, (need, vk) in self._combos.items():
                     if keycode == vk and need == mods:
                         # Defer the actual work to the event loop; keep the tap
@@ -679,6 +699,44 @@ class Controller(QtCore.QObject):
             "floatingbar": self.toggle_bar,
         }.get(name, lambda: None)()
 
+    # ── MENU-BAR MODE: tap-forwarded overlay ESC/Enter (no key window) ──
+    def _overlay_cancel_fs(self):
+        ov = self.overlay
+        if ov is None:
+            return
+        try:
+            ov.cancel()
+        except Exception:
+            self._cancel()
+
+    def _overlay_confirm_fs(self):
+        ov = self.overlay
+        if ov is None:
+            return
+        try:
+            ov.confirm()
+        except Exception:
+            pass
+
+    def _editor_should_take_esc(self):
+        """True when a menu-bar-mode ESC should close the editor: editor visible
+        AND no inline text field is being typed into (that field owns ESC)."""
+        ed = getattr(self, "editor", None)
+        if ed is None or not ed.isVisible():
+            return False
+        try:
+            return getattr(ed.canvas, "_editing", None) is None
+        except Exception:
+            return True
+
+    def _editor_cancel_fs(self):
+        ed = getattr(self, "editor", None)
+        if ed is not None and ed.isVisible():
+            try:
+                ed.close()
+            except Exception:
+                pass
+
     # ── capture lifecycle (auto-hide our own UI) ─────────────────────────
     def _capture_busy(self):
         """True if a capture/recording/edit is already in flight — used to block
@@ -751,6 +809,10 @@ class Controller(QtCore.QObject):
                 log("✕ Không mở được overlay: %s" % e)
                 self._cancel()
                 return
+            # (Menu-bar mode: app runs Accessory for its whole lifetime — set once at
+            # startup. Flipping Regular↔Accessory per capture broke Space-join
+            # for windows created after the first cycle: run 1 visible, run 2+
+            # invisible. CleanShot-class tools never flip either.)
             self.overlay.cancelled.connect(self._cancel)
             self.overlay.start()
         # One breath (60ms) so the floating bar/dialog is truly gone from the
@@ -949,6 +1011,12 @@ class Controller(QtCore.QObject):
             on_copy=lambda qimg: self._on_copy(qimg, log_ctx),
             on_save=lambda qimg: self._on_save(qimg, log_ctx))
         self.editor.show_editor()
+        if platform_backend.MENUBAR_MODE:
+            # Accessory apps don't auto-activate when a window shows — without
+            # this the editor gets NO keyboard (ESC/⌘Z/typing dead; user had to
+            # click buttons). Activating leaves a fullscreen Space — accepted:
+            # the user is switching to editing anyway.
+            platform_backend.activate_app()
         # Put the editor's CANVAS exactly over the region the user just selected,
         # so it feels like editing happens in place (select → annotate, one step).
         self.editor.place_canvas_over(shot.rect[0], shot.rect[1])
@@ -1068,6 +1136,8 @@ class Controller(QtCore.QObject):
         self.gifresult = GifResultWindow(
             path, on_copy=self._on_gif_copy, on_save=self._on_gif_save)
         self.gifresult.show_result()
+        if platform_backend.MENUBAR_MODE:
+            platform_backend.activate_app()   # keyboard/clicks for the result
         self._end_capture()
 
     def _on_gif_copy(self, path):
@@ -1175,6 +1245,8 @@ class Controller(QtCore.QObject):
         # isn't swallowed by the tap (which would fire a capture instead).
         self._suspend_tap()
         self.settings.show_settings()
+        if platform_backend.MENUBAR_MODE:
+            platform_backend.activate_app()   # hotkey recorder needs keyboard
 
     def _after_settings(self):
         # Guarantee the tap is re-enabled even if re-registering/labels raise —
@@ -1201,6 +1273,12 @@ class Controller(QtCore.QObject):
         self.perm_win.show()
         self.perm_win.raise_()
         self.perm_win.activateWindow()
+        if platform_backend.MENUBAR_MODE:
+            # Accessory app doesn't auto-activate → the first-run permission
+            # window would open UNFOCUSED behind other apps. Force it forward
+            # so the team actually sees the setup guidance on first launch.
+            platform_backend.activate_app()
+            self.perm_win.raise_()
 
     def quit(self):
         self._stop_event_tap()
@@ -1219,17 +1297,24 @@ def main():
     QtWidgets.QApplication.setAttribute(
         Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)
     app = QtWidgets.QApplication(sys.argv)
+    if platform_backend.MENUBAR_MODE:
+        # Accessory for the app's WHOLE lifetime (like CleanShot). Flipping
+        # Regular↔Accessory per capture broke fullscreen-Space joining for
+        # windows created after the first cycle (run 1 visible, run 2+ not).
+        # Trade-off (product decision): no Dock icon — menu-bar icon remains.
+        platform_backend.set_accessory_policy(True)
+        log("✓ Chế độ menu-bar (Accessory) — hỗ trợ chụp/quay khi fullscreen")
     app.setApplicationName(theme.APP_NAME)
     app.setApplicationDisplayName(theme.APP_NAME)
     app.setQuitOnLastWindowClosed(False)
 
     theme.load_fonts()
     app.setStyleSheet(theme.app_qss())
-    # NOTE: we intentionally do NOT hide the Dock icon (no LSUIElement /
-    # accessory policy). A pure menu-bar app is invisible & unfindable in
-    # Spotlight, which confuses users ("I opened it and nothing happened").
-    # A normal Dock + Spotlight + Cmd-Tab presence is far more discoverable;
-    # the menu-bar "FC" icon stays too.
+    # NOTE: v1.2 runs as a menu-bar (Accessory) app — see set_accessory_policy
+    # above + LSUIElement in build.sh. We traded the Dock icon (a v1.1 choice
+    # for discoverability) for the ability to capture over another app's native-
+    # fullscreen Space, which a normal windowed app cannot do. The menu-bar "FC"
+    # icon is the entry point; first-run guidance points the user to it.
     app.setApplicationName(theme.APP_NAME)
 
     # Single instance — if FC is already running, don't add a 2nd menu-bar icon.
@@ -1253,7 +1338,7 @@ def main():
     controller.open_bar()
     show_toast("FC-FastCapture đang chạy")
 
-    log("✓ FC-FastCapture đang chạy · biểu tượng 'FC' trên menu bar + Dock.")
+    log("✓ FC-FastCapture đang chạy · biểu tượng 'FC' trên menu bar (thanh trên cùng).")
     log("  Phím tắt: ⌘1 Quick · ⌘2 Edit · ⌘3 Khóa · ⌘4 Cửa sổ · "
         "⌘5 GIF · ⌘0 Thanh nổi")
     sys.exit(app.exec())

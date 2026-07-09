@@ -68,7 +68,12 @@ $X "$PYX" -m PyInstaller \
 echo "▸ Tinh chỉnh Info.plist…"
 set_key () { /usr/libexec/PlistBuddy -c "Add :$1 $2 $3" "$PLIST" 2>/dev/null \
     || /usr/libexec/PlistBuddy -c "Set :$1 $3" "$PLIST" 2>/dev/null || true; }
+# Menu-bar (Accessory) app — no Dock icon; enables fullscreen capture (v1.2).
+set_key LSUIElement bool true
 set_key NSHighResolutionCapable bool true
+APP_VER=$(python -c "import theme; print(theme.APP_VERSION)" 2>/dev/null || echo "1.2")
+set_key CFBundleShortVersionString string "$APP_VER"
+set_key CFBundleVersion string "$APP_VER"
 set_key CFBundleDisplayName string "FC-FastCapture"
 set_key NSHumanReadableCopyright string "Dev by Thắng Huyền Đức · 10XLifeOS"
 

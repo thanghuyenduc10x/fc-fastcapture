@@ -25,6 +25,100 @@ IS_WIN = sys.platform.startswith("win")
 IS_MAC = sys.platform == "darwin"
 IS_LINUX = not IS_WIN and not IS_MAC
 
+# MENU-BAR MODE (macOS): FC runs as an Accessory / menu-bar app (like CleanShot,
+# Shottr) so its capture overlay can float over — and its stop button / toast can
+# be clicked on — ANOTHER app's native-fullscreen Space. Trade-off (chosen by the
+# product owner): no Dock icon (menu-bar icon remains). Always on for macOS; a
+# plain windowed app there could not capture a fullscreen app (the v1.0 bug).
+# Off-mac (Windows/Linux) there is no Spaces concept → False, code paths no-op.
+MENUBAR_MODE = IS_MAC
+
+
+def set_accessory_policy(on):
+    """Switch the app to Accessory (menu-bar, no Dock icon) or Regular policy.
+
+    Called ONCE at startup with on=True. Screenshot tools run as accessory apps
+    because on modern macOS that is a precondition for their windows to join
+    another app's native-fullscreen Space. NOTE: flipping Regular↔Accessory per
+    capture breaks Space-join for windows created after the first flip — so this
+    is set once for the whole app lifetime, never toggled. No-op off macOS.
+    """
+    if not IS_MAC:
+        return
+    try:
+        from AppKit import (NSApp, NSApplicationActivationPolicyAccessory,
+                            NSApplicationActivationPolicyRegular)
+        NSApp.setActivationPolicy_(
+            NSApplicationActivationPolicyAccessory if on
+            else NSApplicationActivationPolicyRegular)
+    except Exception:
+        pass
+
+
+def activate_app():
+    """Explicitly activate the app — Accessory apps don't auto-activate when a
+    window shows, so without this the editor/settings/result windows get NO
+    keyboard. This intentionally leaves a fullscreen Space: it is only called
+    when opening windows the user must TYPE into (edit/settings). No-op off mac.
+    """
+    if not IS_MAC:
+        return
+    try:
+        from AppKit import NSApplication
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+    except Exception:
+        pass
+
+
+def pin_over_all_spaces(widget):
+    """Pin a small utility window (toast / GIF stop button / recording frame)
+    over EVERY Space — incl. another app's fullscreen Space — without
+    activating. Without this, showing e.g. the toast on the primary display's
+    desktop Space forces macOS to SWITCH there ("chọn xong bị văng về màn hình
+    chính"). Same mechanism as the overlay raise. No-op off macOS."""
+    raise_window_over_fullscreen(widget)
+
+
+def raise_window_over_fullscreen(widget):
+    """Float a Qt window ABOVE a native-fullscreen app's Space, WITHOUT
+    activating our app. Finds the NSWindow by matching NSApp.windows() to the
+    widget's on-screen SIZE (overlays are screen-sized) — NOT winId()->NSWindow
+    pointer cast, which segfaults (see the gotcha ledger). No-op off macOS."""
+    if not IS_MAC:
+        return
+    try:
+        from AppKit import (
+            NSApp,
+            NSWindowCollectionBehaviorCanJoinAllSpaces,
+            NSWindowCollectionBehaviorFullScreenAuxiliary,
+            NSWindowCollectionBehaviorStationary)
+        import Quartz
+        gw, gh = int(widget.width()), int(widget.height())
+        target = None
+        for w in NSApp.windows():
+            fr = w.frame()
+            if abs(int(fr.size.width) - gw) <= 8 \
+                    and abs(int(fr.size.height) - gh) <= 8:
+                target = w
+                break
+        if target is None:
+            return
+        # Order matters: collection behavior FIRST (so the window may join the
+        # active fullscreen Space), then level ABOVE the fullscreen window
+        # (shielding level — ScreenSaver level was not enough), then order front.
+        target.setCollectionBehavior_(
+            NSWindowCollectionBehaviorCanJoinAllSpaces
+            | NSWindowCollectionBehaviorFullScreenAuxiliary
+            | NSWindowCollectionBehaviorStationary)
+        try:
+            shield = int(Quartz.CGShieldingWindowLevel())
+        except Exception:
+            shield = 2000
+        target.setLevel_(shield)
+        target.orderFrontRegardless()
+    except Exception:
+        pass
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Paths

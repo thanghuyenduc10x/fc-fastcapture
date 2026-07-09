@@ -133,6 +133,17 @@ def t_autolaunch():
     assert isinstance(autolaunch.current_launch_command(), list)
 check("autolaunch: API", t_autolaunch)
 
+print("\n══ BLOCK 9 · DPI Windows (lõi thuần · bug Vivobook) ══")
+def t_dpi():
+    import capture
+    M = capture.map_logical_to_physical
+    lap125 = [{"x": 0, "y": 0, "w": 1536, "h": 864, "dpr": 1.25}]
+    m = [{"left": 0, "top": 0, "width": 1920, "height": 1080}]
+    assert M((100, 100, 200, 150), lap125, m) == (125, 125, 250, 188, 1.25)
+    lap100 = [{"x": 0, "y": 0, "w": 1920, "h": 1080, "dpr": 1.0}]
+    assert M((10, 20, 30, 40), lap100, m) == (10, 20, 30, 40, 1.0)
+check("DPI: map_logical_to_physical @125% + @100%", t_dpi)
+
 print("\n════════════════════════════════════")
 print("  KẾT QUẢ:  \033[92m%d PASS\033[0m · \033[91m%d FAIL\033[0m" % (PASS, FAIL))
 print("════════════════════════════════════")

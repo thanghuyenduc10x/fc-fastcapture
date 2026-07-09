@@ -19,6 +19,7 @@ import os
 # Identity
 # ─────────────────────────────────────────────────────────────────────────────
 APP_NAME = "FC-FastCapture"
+APP_VERSION = "1.2"          # single source of truth — build scripts + About read this
 BRAND = "10XLifeOS"
 SIGNATURE = "Dev by Thắng Huyền Đức · 10X-LifeOS.Com"
 
@@ -529,6 +530,24 @@ def tool_icon(name, size=20, color=None):
         hl.setAlpha(110)
         p.setBrush(hl)
         p.drawRect(QRectF(0.30 * S, 0.66 * S, 0.40 * S, 0.16 * S))
+    elif name == "pen":             # pen nib + freehand squiggle (opaque)
+        # Diagonal pen body
+        p.drawLine(QPointF(0.40 * S, 0.56 * S), QPointF(0.72 * S, 0.24 * S))
+        # Filled nib tip at lower-left of the body
+        p.setPen(_Qt.PenStyle.NoPen)
+        p.setBrush(qcolor(col))
+        nib = QtGui.QPolygonF([QPointF(0.28 * S, 0.68 * S),
+                               QPointF(0.40 * S, 0.56 * S),
+                               QPointF(0.46 * S, 0.62 * S),
+                               QPointF(0.34 * S, 0.74 * S)])
+        p.drawPolygon(nib)
+        # Freehand squiggle underneath — SOLID (vs highlight's alpha bar)
+        _stroke(p, col, 2.2)
+        path = QtGui.QPainterPath()
+        path.moveTo(QPointF(0.22 * S, 0.88 * S))
+        path.cubicTo(QPointF(0.38 * S, 0.78 * S), QPointF(0.50 * S, 0.98 * S),
+                     QPointF(0.68 * S, 0.86 * S))
+        p.drawPath(path)
     elif name == "blur":            # mosaic grid
         p.setPen(_Qt.PenStyle.NoPen)
         for r in range(3):

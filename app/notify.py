@@ -162,6 +162,16 @@ class Toast(QtWidgets.QWidget):
             self._move_to_corner()
             self.show()
             self.raise_()
+            # Menu-bar mode: pin the toast over EVERY Space — otherwise
+            # showing it on the primary desktop Space yanks macOS out of the
+            # user's fullscreen Space right after a capture ("bị văng về
+            # màn hình chính").
+            try:
+                import platform_backend
+                if platform_backend.MENUBAR_MODE:
+                    platform_backend.pin_over_all_spaces(self)
+            except Exception:
+                pass
             self._move_to_corner()  # re-place after the final size is known
             self._start_fade_in()
             self._timer.start()

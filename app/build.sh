@@ -75,9 +75,16 @@ echo "▸ Tinh chỉnh Info.plist (Dock + Spotlight + retina)…"
 if [ -f "$PLIST" ]; then
   set_key () { /usr/libexec/PlistBuddy -c "Add :$1 $2 $3" "$PLIST" 2>/dev/null \
       || /usr/libexec/PlistBuddy -c "Set :$1 $3" "$PLIST" 2>/dev/null || true; }
-  # NOTE: NO LSUIElement → app appears in Dock, Spotlight and Cmd-Tab so it's
-  # easy to find and launch (the menu-bar "FC" icon is still shown too).
+  # LSUIElement=1 → menu-bar (Accessory) app: NO Dock icon, not in Cmd-Tab.
+  # Required so the capture overlay can float over another app's native-
+  # fullscreen Space (v1.2). Matches CleanShot/Shottr. The "FC" menu-bar icon
+  # is the entry point; the app also calls setActivationPolicy(Accessory) at
+  # startup so dev-mode (no plist) behaves the same.
+  set_key LSUIElement bool true
   set_key NSHighResolutionCapable bool true
+  APP_VER=$(python -c "import theme; print(theme.APP_VERSION)" 2>/dev/null || echo "1.2")
+  set_key CFBundleShortVersionString string "$APP_VER"
+  set_key CFBundleVersion string "$APP_VER"
   set_key CFBundleDisplayName string "FC-FastCapture"
   set_key NSHumanReadableCopyright string "Dev by Thắng Huyền Đức · 10XLifeOS"
 fi

@@ -127,6 +127,52 @@ class _HighlightItem(_Item):
             painter.drawPath(path)
 
 
+class _PenItem(_Item):
+    """An OPAQUE freehand stroke (pen / "Vẽ tay") — the highlighter's sibling.
+
+    Differences vs _HighlightItem: full alpha, normal thickness (no ×3), and
+    midpoint-quadratic smoothing applied ONLY in paint() (the stored data stays
+    a raw point list, so live preview / undo / redo work identically)."""
+
+    def __init__(self, points, color=None, width=4):
+        self.points = [QPoint(p) for p in points]
+        self.color = color or theme.ANNOTATION
+        self.width = width
+
+    def add(self, p):
+        # Point-thinning: skip points closer than 2 logical px to the last one
+        # (bounds list growth during slow, dense drags on retina mice).
+        if self.points and (p - self.points[-1]).manhattanLength() < 2:
+            return
+        self.points.append(QPoint(p))
+
+    def paint(self, painter, scale):
+        if len(self.points) < 1:
+            return
+        pen = QtGui.QPen(theme.qcolor(self.color))   # opaque — no setAlpha
+        pen.setWidthF(max(1.0, self.width * scale))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        pts = [QtCore.QPointF(p.x() * scale, p.y() * scale)
+               for p in self.points]
+        if len(pts) == 1:
+            painter.drawPoint(pts[0])   # single click → round dot (RoundCap)
+            return
+        # Midpoint smoothing: curve through each point toward the next midpoint
+        # — an opaque thin stroke shows polyline corners far more than the fat
+        # translucent highlighter, so this is worth the few extra lines.
+        path = QtGui.QPainterPath()
+        path.moveTo(pts[0])
+        for i in range(1, len(pts) - 1):
+            mid = QtCore.QPointF((pts[i].x() + pts[i + 1].x()) / 2.0,
+                                 (pts[i].y() + pts[i + 1].y()) / 2.0)
+            path.quadTo(pts[i], mid)
+        path.lineTo(pts[-1])
+        painter.drawPath(path)
+
+
 class _BlurItem(_Item):
     """Pixelates a rectangular region of the base image (hide sensitive info)."""
 
@@ -224,7 +270,7 @@ class _Canvas(QtWidgets.QWidget):
         self._tool = tool
         if tool == "text":
             self.setCursor(Qt.CursorShape.IBeamCursor)
-        elif tool in ("arrow", "rect", "highlight", "blur", "step"):
+        elif tool in ("arrow", "rect", "highlight", "pen", "blur", "step"):
             self.setCursor(Qt.CursorShape.CrossCursor)
         else:
             self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -264,7 +310,7 @@ class _Canvas(QtWidgets.QWidget):
             pass
 
     def _preview_item(self):
-        if self._tool == "highlight" and self._live is not None:
+        if self._tool in ("highlight", "pen") and self._live is not None:
             return self._live
         if self._drag_start is None or self._drag_cur is None:
             return None
@@ -293,6 +339,10 @@ class _Canvas(QtWidgets.QWidget):
             self._live = _HighlightItem([pos], self._editor.current_color(),
                                         self._editor.current_width() * 3)
             self.update()
+        elif self._tool == "pen":
+            self._live = _PenItem([pos], self._editor.current_color(),
+                                  self._editor.current_width())   # no ×3
+            self.update()
         elif self._tool in ("arrow", "rect", "blur"):
             self._drag_start = pos
             self._drag_cur = pos
@@ -300,7 +350,7 @@ class _Canvas(QtWidgets.QWidget):
 
     def mouseMoveEvent(self, event):
         pos = event.position().toPoint()
-        if self._tool == "highlight" and self._live is not None:
+        if self._tool in ("highlight", "pen") and self._live is not None:
             self._live.add(pos)
             self.update()
         elif self._drag_start is not None:
@@ -310,9 +360,11 @@ class _Canvas(QtWidgets.QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:
             return
-        if self._tool == "highlight" and self._live is not None:
-            # Need a real stroke — a single click is just a dot (or nothing).
-            if len(self._live.points) >= 2:
+        if self._tool in ("highlight", "pen") and self._live is not None:
+            # Highlight needs a real stroke (≥2 points); pen commits even a
+            # single click — an opaque round dot is useful for marking points.
+            min_pts = 1 if self._tool == "pen" else 2
+            if len(self._live.points) >= min_pts:
                 self._editor.add_item(self._live)
             self._live = None
             self.update()
@@ -478,8 +530,14 @@ class EditorWindow(QtWidgets.QWidget):
 
         panel = QtWidgets.QFrame(self)
         panel.setObjectName("panel")
-        panel.setStyleSheet("QFrame#panel{%s}" % theme.qss_panel())
-        theme.apply_glow(panel, blur=34, dy=10, alpha=120)
+        # Bright accent border + accent glow so the editor stands out from the
+        # frozen screenshot behind it (esp. over a fullscreen app, where a
+        # subtle panel border blended into the background — "lẫn với màn hình").
+        panel.setStyleSheet(
+            "QFrame#panel{background-color:%s;border:2px solid %s;"
+            "border-radius:%dpx;}" % (theme.PANEL, theme.ACCENT,
+                                      theme.RADIUS_PANEL))
+        theme.apply_glow(panel, color=theme.ACCENT, blur=44, dy=0, alpha=210)
         outer.addWidget(panel)
 
         col = QtWidgets.QVBoxLayout(panel)
@@ -553,6 +611,7 @@ class EditorWindow(QtWidgets.QWidget):
         tools = [
             ("text", "Chữ (gõ trên ảnh)"),
             ("arrow", "Mũi tên"), ("rect", "Khung chữ nhật"),
+            ("pen", "Vẽ tay"),
             ("highlight", "Bút dạ quang"), ("blur", "Làm mờ (che thông tin)"),
             ("step", "Đánh số bước"),
         ]

@@ -383,6 +383,14 @@ class StopButton(QtWidgets.QWidget):
     # ── elapsed timer ────────────────────────────────────────────────────
     def showEvent(self, event):
         super().showEvent(event)
+        # Menu-bar mode: keep the Stop button visible/clickable over a
+        # native-fullscreen Space (it lives outside the recorded region).
+        try:
+            import platform_backend
+            if platform_backend.MENUBAR_MODE:
+                platform_backend.pin_over_all_spaces(self)
+        except Exception:
+            pass
         if self._timer is None:
             self._start = time.time()
             self._timer = QTimer(self)
@@ -525,6 +533,9 @@ class RecordingFrame(QtWidgets.QWidget):
         try:
             self.show()
             self.raise_()
+            import platform_backend
+            if platform_backend.MENUBAR_MODE:
+                platform_backend.pin_over_all_spaces(self)
         except Exception:
             pass
 

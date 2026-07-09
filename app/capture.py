@@ -531,16 +531,76 @@ def capture_region_dpi(x, y, w, h):
     return shot
 
 
+def map_logical_to_physical(rect, screens, monitors):
+    """PURE core of the DPI mapping — no Qt, no mss, no OS calls, so it is unit-
+    testable on any platform (see test_dpi.py). Reproduces the Asus-Vivobook
+    class of bug deterministically.
+
+        rect     : (x, y, w, h) LOGICAL global rect.
+        screens  : list of {"x","y","w","h","dpr"} — Qt screens (logical geo+DPR).
+                   Put the center/primary screen FIRST (parity with Qt.screenAt).
+        monitors : list of {"left","top","width","height"} — mss PHYSICAL monitors
+                   (already EXCLUDING mss.monitors[0], the union box).
+
+    Returns (px, py, pw, ph, scale) in PHYSICAL pixels, or None when matching is
+    ambiguous (caller then falls back to identity). Uses object identity in
+    `screens` for the multi-identical-monitor tiebreak.
+    """
+    rx, ry, rw, rh = int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3])
+    cx, cy = rx + rw / 2.0, ry + rh / 2.0
+    sc = None
+    for s in screens:
+        if s["x"] <= cx < s["x"] + s["w"] and s["y"] <= cy < s["y"] + s["h"]:
+            sc = s
+            break
+    if sc is None:
+        sc = screens[0] if screens else None
+    if sc is None:
+        return None
+    dpr = float(sc.get("dpr") or 1.0)
+    pw = int(round(sc["w"] * dpr))
+    ph = int(round(sc["h"] * dpr))
+    matches = [m for m in monitors
+               if abs(m["width"] - pw) <= 2 and abs(m["height"] - ph) <= 2]
+    if len(matches) == 1:
+        mon = matches[0]
+    elif len(monitors) == 1:
+        # Single monitor (the Vivobook case) — trivially unambiguous.
+        mon = monitors[0]
+    elif len(matches) > 1:
+        # Two+ identical monitors: same physical size ⇒ same DPR ⇒ matching Qt
+        # screens share logical size too. Left-to-right / top-to-bottom ORDER is
+        # preserved between Qt screens and mss monitors, so rank our screen among
+        # its same-size Qt siblings and pick the same rank among the mss ones.
+        qt_same = [s for s in screens
+                   if abs(int(round(s["w"] * float(s.get("dpr") or 1))) - pw) <= 2
+                   and abs(int(round(s["h"] * float(s.get("dpr") or 1))) - ph) <= 2]
+        qt_same.sort(key=lambda s: (s["x"], s["y"]))
+        matches.sort(key=lambda m: (m["left"], m["top"]))
+        idx = next((i for i, s in enumerate(qt_same) if s is sc), None)
+        if idx is None or idx >= len(matches):
+            return None
+        mon = matches[idx]
+    else:
+        return None
+    lx = rx - sc["x"]
+    ly = ry - sc["y"]
+    return (int(mon["left"] + round(lx * dpr)),
+            int(mon["top"] + round(ly * dpr)),
+            max(1, int(round(rw * dpr))),
+            max(1, int(round(rh * dpr))),
+            dpr)
+
+
 def logical_rect_to_physical(x, y, w, h):
     """Map a LOGICAL global rect to the PHYSICAL-pixel rect mss expects.
 
     macOS: identity — mss speaks logical points there (current behaviour).
     Windows: Qt speaks logical (scaled) coordinates while mss speaks physical
-    pixels, so a 125%-scaled laptop (the Asus Vivobook case) offsets every
-    grab by 25%. We match the Qt screen containing the rect to its mss monitor
-    (physical) and rebuild the rect: mon_origin + local_logical × DPR.
-    Returns (x, y, w, h[, scale]) — a 5th element carries the applied scale.
-    Falls back to identity (scale 1.0) whenever matching is ambiguous.
+    pixels, so a 125%-scaled laptop (the Asus Vivobook case) offsets every grab
+    by 25%. The real Qt/mss data is GATHERED here; the math lives in the pure,
+    unit-tested map_logical_to_physical(). Falls back to identity (scale 1.0) on
+    any error or ambiguity. Returns (x, y, w, h, scale).
     """
     try:
         import platform_backend
@@ -550,58 +610,27 @@ def logical_rect_to_physical(x, y, w, h):
         return (int(x), int(y), int(w), int(h), 1.0)
     try:
         from PyQt6 import QtGui
-        from PyQt6.QtCore import QRect as _QRect, QPoint as _QPoint
-        rect = _QRect(int(x), int(y), int(w), int(h))
-        sc = QtGui.QGuiApplication.screenAt(rect.center())
-        if sc is None:
-            sc = QtGui.QGuiApplication.primaryScreen()
-        if sc is None:
-            return (int(x), int(y), int(w), int(h), 1.0)
-        geo = sc.geometry()
-        dpr = float(sc.devicePixelRatio() or 1.0)
-        # Find the mss monitor whose physical size matches this screen.
+        from PyQt6.QtCore import QRect as _QRect
         import mss
+        # ONE dict per Qt screen (identity matters for the tiebreak).
+        by_screen = {}
+        for s in QtGui.QGuiApplication.screens():
+            g = s.geometry()
+            by_screen[s] = {"x": g.x(), "y": g.y(), "w": g.width(),
+                            "h": g.height(),
+                            "dpr": float(s.devicePixelRatio() or 1.0)}
+        rc = QtGui.QGuiApplication.screenAt(
+            _QRect(int(x), int(y), int(w), int(h)).center()) \
+            or QtGui.QGuiApplication.primaryScreen()
+        sel = by_screen.get(rc)
+        # Center/primary screen first → parity with Qt.screenAt semantics.
+        screens = ([sel] if sel is not None else []) + \
+                  [d for s, d in by_screen.items() if d is not sel]
         with mss.mss() as sct:
-            mons = sct.monitors[1:]  # [0] is the union
-            pw = int(round(geo.width() * dpr))
-            ph = int(round(geo.height() * dpr))
-            matches = [m for m in mons
-                       if abs(m["width"] - pw) <= 2 and abs(m["height"] - ph) <= 2]
-            if len(matches) == 1:
-                mon = matches[0]
-            elif len(mons) == 1:
-                # Single monitor (the Vivobook case) — trivially unambiguous.
-                mon = mons[0]
-            elif len(matches) > 1:
-                # Two+ identical monitors: same physical size ⇒ same DPR ⇒
-                # matching Qt screens share logical size too. Left-to-right /
-                # top-to-bottom ORDER is preserved between Qt screens and mss
-                # monitors, so rank our screen among its same-size Qt siblings
-                # and pick the same rank among the size-matched mss monitors.
-                qt_same = [s for s in QtGui.QGuiApplication.screens()
-                           if abs(int(round(s.geometry().width()
-                                            * float(s.devicePixelRatio() or 1)))
-                                  - pw) <= 2
-                           and abs(int(round(s.geometry().height()
-                                             * float(s.devicePixelRatio() or 1)))
-                                   - ph) <= 2]
-                qt_same.sort(key=lambda s: (s.geometry().x(), s.geometry().y()))
-                matches.sort(key=lambda m: (m["left"], m["top"]))
-                try:
-                    idx = qt_same.index(sc)
-                except ValueError:
-                    return (int(x), int(y), int(w), int(h), 1.0)
-                if idx >= len(matches):
-                    return (int(x), int(y), int(w), int(h), 1.0)
-                mon = matches[idx]
-            else:
-                return (int(x), int(y), int(w), int(h), 1.0)
-            lx = rect.x() - geo.x()
-            ly = rect.y() - geo.y()
-            return (int(mon["left"] + round(lx * dpr)),
-                    int(mon["top"] + round(ly * dpr)),
-                    max(1, int(round(rect.width() * dpr))),
-                    max(1, int(round(rect.height() * dpr))),
-                    dpr)
+            mons = [dict(m) for m in sct.monitors[1:]]  # [0] is the union
+        res = map_logical_to_physical((x, y, w, h), screens, mons)
+        if res is None:
+            return (int(x), int(y), int(w), int(h), 1.0)
+        return res
     except Exception:
         return (int(x), int(y), int(w), int(h), 1.0)

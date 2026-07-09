@@ -1,8 +1,10 @@
 name: Build Windows (.exe)
 
 # Builds the Windows x64 executable on a real Windows runner (PyInstaller cannot
-# cross-compile), uploads it as a run artifact, and attaches it to the v1.0
-# GitHub Release next to the macOS .dmg files.
+# cross-compile) and uploads it as a RUN ARTIFACT for testing (download via
+# `gh run download`). It does NOT touch any GitHub Release — releases are cut
+# MANUALLY after the .exe passes VM testing, so a code push can never clobber a
+# published rollback build. To attach to a release, push a version tag (below).
 
 on:
   workflow_dispatch: {}          # run on demand from the Actions tab
@@ -11,6 +13,8 @@ on:
     paths:
       - 'app/**'
       - '.github/workflows/build-windows.yml'
+    tags:
+      - 'v*'                      # a version tag → also attach to that release
 
 permissions:
   contents: write                # needed to upload the release asset
@@ -82,8 +86,11 @@ jobs:
           name: FC-FastCapture-Windows
           path: app/dist/FC-FastCapture-Windows.exe
 
-      - name: Attach to v1.1 release
-        if: github.event_name != 'pull_request'
+      # Attach to a release ONLY when a version tag (v*) is pushed — the tag name
+      # IS the release, so this can never clobber a different version's asset.
+      # A plain push to main just leaves the run artifact for testing.
+      - name: Attach to the tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload v1.1 "dist/FC-FastCapture-Windows.exe" --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" "dist/FC-FastCapture-Windows.exe" --clobber

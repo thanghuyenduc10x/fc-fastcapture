@@ -185,13 +185,36 @@ class SelectionOverlay(QtWidgets.QWidget):
         self._init_mode_state()
 
         try:
+            if getattr(self, "_menubar", False):
+                # MENU-BAR MODE: the collection behavior must be applied
+                # BEFORE the window is first shown — macOS assigns the window
+                # to a Space at order-in time and does NOT re-evaluate when the
+                # behavior changes afterwards (why an earlier attempt showed
+                # nothing over fullscreen despite the raise "succeeding").
+                # winId() forces the native NSWindow to exist while hidden.
+                try:
+                    import platform_backend
+                    self.winId()
+                    platform_backend.raise_window_over_fullscreen(self)
+                except Exception:
+                    pass
             self.show()
             self.setGeometry(geo)            # re-assert after show (macOS quirk)
             self.raise_()
-            self.activateWindow()
-            if self._active:
-                self.setFocus(Qt.FocusReason.OtherFocusReason)
-                self.grabKeyboard()           # only the cursor's-screen overlay
+            if getattr(self, "_menubar", False):
+                # Re-assert level + order AFTER show; still NO activateWindow
+                # (activation is what kicks macOS out of the fullscreen Space).
+                # ESC/Enter arrive via the CGEventTap instead.
+                try:
+                    import platform_backend
+                    platform_backend.raise_window_over_fullscreen(self)
+                except Exception:
+                    pass
+            else:
+                self.activateWindow()
+                if self._active:
+                    self.setFocus(Qt.FocusReason.OtherFocusReason)
+                    self.grabKeyboard()       # only the cursor's-screen overlay
         except Exception:
             pass
         self._ensure_action_box()
@@ -765,9 +788,16 @@ class MultiScreenOverlay(QtCore.QObject):
         # Pull FC to the front so the active overlay can become the key window and
         # receive ESC/Enter — the hotkey fires while another app is frontmost.
         # macOS: AppKit activate; Windows: relax the foreground lock.
+        # MENU-BAR MODE (macOS): activating the app switches OUT of a native-
+        # fullscreen Space (the v1.0 bug). So do NOT activate — instead raise each
+        # overlay ABOVE the fullscreen Space (per-overlay start()) and forward
+        # ESC/Enter through the CGEventTap (main.py), since we can't be key window.
+        menubar = False
         try:
             import platform_backend
-            platform_backend.pull_to_foreground()
+            menubar = bool(getattr(platform_backend, "MENUBAR_MODE", False))
+            if not menubar:
+                platform_backend.pull_to_foreground()
         except Exception:
             pass
         # Only the overlay on the cursor's screen grabs the keyboard (ESC/Enter);
@@ -784,9 +814,26 @@ class MultiScreenOverlay(QtCore.QObject):
             self._overlays[0]._active = True
         for ov in self._overlays:
             try:
+                ov._menubar = menubar
                 ov.start()
             except Exception:
                 pass
+
+    def cancel(self):
+        """Menu-bar mode: tap-forwarded ESC → cancel the whole selection."""
+        self._on_cancelled()
+
+    def confirm(self):
+        """Menu-bar mode: tap-forwarded Enter → confirm the active overlay's rect."""
+        for ov in self._overlays:
+            if getattr(ov, "_active", False):
+                try:
+                    r = ov._current_rect()
+                    if r.width() > 0 and r.height() > 0:
+                        ov._finish(r)
+                except Exception:
+                    pass
+                return
 
     def _on_selected(self, rect, overlay=None):
         if self._done:
