@@ -377,6 +377,21 @@ def save_pil(pil_img, path):
         return ""
 
 
+def unique_path(folder, stem, ext=".png", exists=os.path.exists, max_tries=100):
+    """folder/stem+ext, appending -1, -2… while the name is taken.
+
+    Mode 6 auto-saves without ever prompting, and _timestamp() is only
+    second-precise — two captures in the same second must NOT overwrite.
+    `exists` is injectable so tests run without touching the disk.
+    """
+    cand = os.path.join(folder, stem + ext)
+    n = 1
+    while exists(cand) and n <= max_tries:
+        cand = os.path.join(folder, "%s-%d%s" % (stem, n, ext))
+        n += 1
+    return cand
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # FREEZE-FIRST capture (v1.1) — the screen is snapshotted the INSTANT the
 # hotkey fires; the user then selects a region ON the frozen image and we CROP

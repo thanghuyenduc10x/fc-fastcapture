@@ -161,6 +161,20 @@ class GifRecorder(QtCore.QObject):
                     # Build a PIL RGB frame from the BGRA buffer.
                     frame = Image.frombytes(
                         "RGB", raw.size, raw.bgra, "raw", "BGRX")
+                    # Downscale AT GRAB TIME, not only at export: buffering a
+                    # retina-size region full-res cost ~11.5 MB/frame
+                    # (1200×800@2x) → GBs per long recording — the "app ăn
+                    # RAM" report. Capping here divides buffer RAM ~5-6× with
+                    # IDENTICAL output: export downscales to this same cap
+                    # anyway (its _downscale_factor sees ≤cap → 1.0, so
+                    # nothing is ever resized twice).
+                    if max(frame.size) > _MAX_LONG_SIDE:
+                        try:
+                            resample = Image.Resampling.LANCZOS
+                        except AttributeError:   # Pillow < 9.1
+                            resample = Image.LANCZOS
+                        frame.thumbnail(
+                            (_MAX_LONG_SIDE, _MAX_LONG_SIDE), resample)
                 except Exception:
                     # Skip a bad frame but keep recording.
                     frame = None

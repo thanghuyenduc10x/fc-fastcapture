@@ -168,11 +168,12 @@ def place_window_on_screen(win, x, y):
 # Folder picker (Block B) — brand styled, with "Nhớ thư mục này" checkbox
 # ─────────────────────────────────────────────────────────────────────────────
 class FolderPickDialog(QtWidgets.QDialog):
-    def __init__(self, current, parent=None):
+    def __init__(self, current, parent=None, show_remember=True, title=None):
         super().__init__(parent)
-        self.setWindowTitle("Chọn thư mục lưu")
+        self.setWindowTitle(title or "Chọn thư mục lưu")
         self.setMinimumWidth(440)
         self._path = current
+        self._show_remember = bool(show_remember)
         self.setStyleSheet(theme.app_qss())
 
         root = QtWidgets.QVBoxLayout(self)
@@ -195,7 +196,13 @@ class FolderPickDialog(QtWidgets.QDialog):
         root.addLayout(row)
 
         self.remember = QtWidgets.QCheckBox("Nhớ thư mục này (không hỏi lại)")
-        root.addWidget(self.remember)
+        if self._show_remember:
+            root.addWidget(self.remember)
+        else:
+            # Mode 6 ALWAYS remembers — showing the checkbox would only
+            # confuse ("what happens if I untick it?").
+            self.remember.setChecked(True)
+            self.remember.hide()
 
         btns = QtWidgets.QHBoxLayout()
         btns.addStretch(1)
@@ -491,6 +498,7 @@ class Controller(QtCore.QObject):
         add("Chụp khóa kích thước", "mode3", self.mode3)
         add("Chụp cửa sổ", "mode4", self.mode4)
         add("Quay GIF", "mode5", self.mode5)
+        add("Chụp + tự lưu", "mode6", self.mode6)
         menu.addSeparator()
         add("Mở thanh nổi", "floatingbar", self.open_bar)
         add("Settings", "", self.open_settings)
@@ -542,7 +550,8 @@ class Controller(QtCore.QObject):
         return (frozenset(mods), vk)
 
     def _rebuild_combos(self):
-        names = ["mode1", "mode2", "mode3", "mode4", "mode5", "floatingbar"]
+        names = ["mode1", "mode2", "mode3", "mode4", "mode5", "mode6",
+                 "floatingbar"]
         self._combos = {}
         for name in names:
             parsed = self._parse_combo(self.cfg.hotkey(name))
@@ -695,7 +704,7 @@ class Controller(QtCore.QObject):
     def dispatch(self, name):
         {
             "mode1": self.mode1, "mode2": self.mode2, "mode3": self.mode3,
-            "mode4": self.mode4, "mode5": self.mode5,
+            "mode4": self.mode4, "mode5": self.mode5, "mode6": self.mode6,
             "floatingbar": self.toggle_bar,
         }.get(name, lambda: None)()
 
@@ -790,9 +799,15 @@ class Controller(QtCore.QObject):
     # Fixes both the "missed the moment while dragging" UX and the Windows
     # DPI offset bug (crop is per-screen local + explicit scale; the legacy
     # global-logical-rect → mss path was wrong under 125-150% scaling).
-    def _start_frozen_overlay(self, build_overlay):
+    def _start_frozen_overlay(self, build_overlay, delay_ms=60):
         """build_overlay(frozen_list) must return a started-ready overlay with
-        .selected already connected. Freeze failure → live overlay (legacy)."""
+        .selected already connected. Freeze failure → live overlay (legacy).
+
+        delay_ms: how long to wait before grabbing the freeze. 60ms is enough
+        for the floating bar to hide; a MODAL DIALOG that just closed (mode 3's
+        size input) needs ~300ms or its window is still on screen when we grab
+        — it then gets burned into the frozen backdrop AND the final capture
+        (reported on both Windows VM and Mac)."""
         self._begin_capture()
         self._freezing = True
         def go():
@@ -817,7 +832,7 @@ class Controller(QtCore.QObject):
             self.overlay.start()
         # One breath (60ms) so the floating bar/dialog is truly gone from the
         # screen before we freeze — imperceptible, keeps our UI out of the shot.
-        QTimer.singleShot(60, go)
+        QTimer.singleShot(max(0, int(delay_ms)), go)
 
     def _grab(self, rect, handler):
         # Freeze-first: crop from the frozen snapshot — instant, DPI-proof.
@@ -880,6 +895,80 @@ class Controller(QtCore.QObject):
         self.overlay = None
         self._end_capture()
 
+    # ── MODE 6 — capture → AUTO-SAVE to a fixed folder (v1.3) ────────────
+    # First use asks for the folder ONCE (FolderPickDialog, remember hidden);
+    # every later capture saves silently. Clipboard is also filled so the
+    # shot can be pasted immediately. The folder is changeable in Settings.
+    def mode6(self):
+        if self._capture_busy():
+            return
+        def build(frozen):
+            ov = SelectionOverlay(mode="free", frozen=frozen)
+            ov.selected.connect(lambda r: self._grab(r, self._after_mode6))
+            return ov
+        self._start_frozen_overlay(build)
+
+    def _ask_mode6_dir(self):
+        """First-run (or folder-lost) picker. Returns the folder or None.
+
+        Runs a NESTED exec() loop → suspend the tap so a second hotkey can't
+        dispatch into it (mode3's defensive pattern). As an Accessory app we
+        must activate explicitly or the dialog gets no keyboard/focus.
+        """
+        self._suspend_tap()
+        try:
+            platform_backend.activate_app()
+            dlg = FolderPickDialog(
+                self.cfg.mode6_dir() or self.cfg.save_dir(),
+                show_remember=False,
+                title="Chụp + tự lưu — chọn thư mục (hỏi một lần)")
+            res = dlg.get()
+        finally:
+            self._resume_tap()
+        if res is None:
+            return None
+        folder = res[0]
+        self.cfg.set_mode6_dir(folder)
+        return folder
+
+    def _after_mode6(self, shot):
+        # 1) Clipboard first — it must survive ANY save failure below.
+        try:
+            capture.copy_pil_to_clipboard(shot.image)
+        except Exception as e:
+            log("✕ Lỗi copy: %s" % e)
+        self.cfg.set_remembered_size(shot.rect[2], shot.rect[3])
+
+        # 2) Resolve the auto-save folder: configured & creatable, else ask
+        #    (first run — or the remembered folder vanished, e.g. Drive
+        #    unmounted/renamed; asking beats silently saving elsewhere).
+        folder = self.cfg.ensure_mode6_dir()
+        if not folder:
+            folder = self._ask_mode6_dir()
+
+        # 3) Save (never prompts → collision suffix -1/-2 for same-second shots).
+        saved_name = ""
+        if folder:
+            try:
+                path = capture.unique_path(folder, _timestamp(), ".png")
+                if capture.save_pil(shot.image, path):
+                    saved_name = os.path.basename(path)
+            except Exception as e:
+                log("✕ MODE 6 · Tự lưu lỗi: %s" % e)
+
+        if saved_name:
+            show_toast("Đã lưu %s (+ clipboard)" % saved_name)
+            log("✓ MODE 6 · Đã tự lưu %s · Đã copy clipboard" % saved_name)
+        elif folder:
+            show_toast("Đã copy · Tự lưu file thất bại", ok=False)
+            log("✕ MODE 6 · Tự lưu thất bại (thư mục: %s) · clipboard OK" % folder)
+        else:
+            show_toast("Đã copy · chưa lưu (chưa chọn thư mục)", ok=False)
+            log("• MODE 6 · Người dùng chưa chọn thư mục · clipboard OK")
+        # EVERY exit path must release the busy-guard or all captures lock up.
+        self.overlay = None
+        self._end_capture()
+
     # ── MODE 2 / 3 / 4 — capture then edit in place ──────────────────────
     def mode2(self):
         if self._capture_busy():
@@ -910,7 +999,17 @@ class Controller(QtCore.QObject):
         # parallel capture. Suspend the global tap for the dialog's lifetime.
         self._suspend_tap()
         try:
-            res = SizeInputDialog(w, h).get_size()
+            dlg = SizeInputDialog(w, h)
+            res = dlg.get_size()
+            # Force the dialog OFF-SCREEN before we freeze: hide + flush the
+            # event loop so the window server actually removes it. exec()
+            # returning does NOT mean the window is gone from the compositor.
+            try:
+                dlg.hide()
+                dlg.deleteLater()
+                QtWidgets.QApplication.processEvents()
+            except Exception:
+                pass
         finally:
             self._resume_tap()
         if res is None:
@@ -927,9 +1026,10 @@ class Controller(QtCore.QObject):
             ov.selected.connect(
                 lambda r: self._grab(r, lambda s: self._edit(s, "MODE 3", ctx)))
             return ov
-        # Freeze AFTER the size dialog closed (60ms in the helper lets it
-        # vanish from screen) so the dialog never appears in the snapshot.
-        self._start_frozen_overlay(build)
+        # Freeze well AFTER the size dialog closed — 60ms was NOT enough for a
+        # modal dialog's teardown (it got captured into the frozen backdrop on
+        # both Windows and Mac); 300ms + the explicit hide/flush above is.
+        self._start_frozen_overlay(build, delay_ms=300)
 
     def mode4(self):
         if self._capture_busy():

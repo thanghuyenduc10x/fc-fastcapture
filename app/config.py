@@ -31,6 +31,7 @@ if _IS_WIN:
         "mode3": "<ctrl>+<alt>+3",   # Locked size + edit
         "mode4": "<ctrl>+<alt>+4",   # Window capture + edit
         "mode5": "<ctrl>+<alt>+5",   # Record → GIF
+        "mode6": "<ctrl>+<alt>+6",   # Capture → auto-save to fixed folder (v1.3)
         "floatingbar": "<ctrl>+<alt>+0",
     }
 else:
@@ -40,6 +41,7 @@ else:
         "mode3": "<cmd>+3",   # Locked size + edit
         "mode4": "<cmd>+4",   # Window capture + edit
         "mode5": "<cmd>+5",   # Record → GIF
+        "mode6": "<cmd>+6",   # Capture → auto-save to fixed folder (v1.3)
         "floatingbar": "<cmd>+0",
     }
 
@@ -58,6 +60,9 @@ DEFAULTS = {
     # Block B — save behavior
     "save_dir": DEFAULT_SAVE_DIR,
     "remember_folder": False,
+    # Mode 6 — capture → auto-save (v1.3). Empty = not chosen yet → the FIRST
+    # mode-6 capture shows the folder picker, then saves silently ever after.
+    "mode6_dir": "",
     # GIF
     "gif_fps": 15,
 }
@@ -66,12 +71,13 @@ DEFAULTS = {
 if _IS_WIN:
     HOTKEY_LABELS = {
         "mode1": "Ctrl+Alt+1", "mode2": "Ctrl+Alt+2", "mode3": "Ctrl+Alt+3",
-        "mode4": "Ctrl+Alt+4", "mode5": "Ctrl+Alt+5", "floatingbar": "Ctrl+Alt+0",
+        "mode4": "Ctrl+Alt+4", "mode5": "Ctrl+Alt+5", "mode6": "Ctrl+Alt+6",
+        "floatingbar": "Ctrl+Alt+0",
     }
 else:
     HOTKEY_LABELS = {
         "mode1": "⌘1", "mode2": "⌘2", "mode3": "⌘3",
-        "mode4": "⌘4", "mode5": "⌘5", "floatingbar": "⌘0",
+        "mode4": "⌘4", "mode5": "⌘5", "mode6": "⌘6", "floatingbar": "⌘0",
     }
 
 _PRETTY_SYM = {
@@ -224,6 +230,29 @@ class Config:
             os.makedirs(path, exist_ok=True)
             self.set_save_dir(path)
         return path
+
+    # ── Mode 6: capture → auto-save folder (v1.3) ────────────────────────
+    def mode6_dir(self):
+        """The fixed auto-save folder; "" = not chosen yet (first run asks)."""
+        return self.data.get("mode6_dir", "")
+
+    def set_mode6_dir(self, path):
+        # normpath strips trailing separators so equality checks stay sane.
+        self.data["mode6_dir"] = os.path.normpath(path) if path else ""
+        self.save()
+
+    def ensure_mode6_dir(self):
+        """Create the mode-6 folder if missing; return its path or "" on
+        failure. NO silent fallback to another location — the caller re-asks
+        the user instead (saving somewhere unexpected is worse than asking)."""
+        path = self.mode6_dir()
+        if not path:
+            return ""
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except OSError:
+            return ""
 
 
 _SINGLETON = None

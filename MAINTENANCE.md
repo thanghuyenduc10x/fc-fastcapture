@@ -72,6 +72,11 @@ cd app && ./build.sh && ./build-intel.sh   # 2 bản .dmg (arm64 + Intel)
 - **Chữ ký macOS cố định** ("FC-FastCapture Dev (10XLifeOS)", keychain `fc-codesign.keychain-db`) → giữ quyền TCC qua các build; đổi chữ ký = reset quyền người dùng.
 - **DPI Windows**: overlay trả toạ độ *logical*, mss nhận *physical* → phải map qua `capture.logical_rect_to_physical` / crop từ ảnh freeze. Test ở 100/125/150%.
 - Cài .app xong: `lsregister -f /Applications/FC-FastCapture.app` (Spotlight thấy).
+- **CI trên `windows-latest`: run-step mặc định là POWERSHELL** — cú pháp biến bash `"$VAR"` nở thành chuỗi RỖNG không báo lỗi (dính 3 lần: `gh release upload "$GITHUB_REF_NAME"` → "release not found"). Luôn dùng `${{ github.x }}` expression (thay thế trước khi shell chạy) hoặc `$env:VAR`.
+- **Dialog modal đóng ≠ biến khỏi màn hình** — mode 3: freeze sau dialog 60ms vẫn "nướng" dialog vào ảnh đóng băng (cả 2 nền, VM rõ nhất). Fix: `hide()` + `deleteLater()` + `processEvents()` ngay khi đóng + freeze đợi 300ms (`_start_frozen_overlay(delay_ms=300)`).
+- **Dialog trong capture-callback (mode 6 first-run)**: nested `exec()` → phải `_suspend_tap()`/`_resume_tap()` (pattern mode 3) + `activate_app()` (app Accessory không tự lấy bàn phím) + MỌI đường thoát đều `overlay=None` + `_end_capture()` (kể cả Huỷ — quên là busy-guard kẹt vĩnh viễn).
+- **RAM quay GIF**: frame phải downscale NGAY LÚC QUAY (`_grab`, cap `_MAX_LONG_SIDE=1000px`) chứ không chỉ lúc export — đo thật: 75 frame vùng 2400×1600 = 1102 MB → 121 MB (giảm 9×), chất lượng file GIF không đổi (export vốn thu về đúng cap đó; `_downscale_factor` thấy ≤cap → 1.0, không resize 2 lần).
+- **Thêm 1 mode mới = đúng 6 điểm data-driven**: `config._DEFAULT_HOTKEYS` (CẢ 2 nhánh OS) · `main._rebuild_combos` (list cứng) · `main.dispatch` · `modeN()`+`_after_modeN()` (mirror mode 1) · tray `_build_tray` · `settings._HOTKEY_ROWS` · `hotkeys_win._HOTKEY_NAMES`. Deep-merge tự bơm hotkey mới vào config cũ — không cần migration.
 - **Chụp/quay khi app khác FULLSCREEN (v1.2)** — chốt sau nhiều lần thử:
   - App phải chạy **Accessory** (`setActivationPolicy(Accessory)` lúc khởi động + `LSUIElement=1` trong plist) → **mất icon Dock** (đánh đổi đã chốt, như CleanShot). Đây là *tiền đề* để cửa sổ join được Space fullscreen của app khác.
   - **KHÔNG flip** Regular↔Accessory theo từng lần chụp: sau chu kỳ flip đầu, cửa sổ tạo mới hết join được Space → lần 1 hiện, lần 2+ vô hình. Set 1 lần, giữ suốt đời app.
@@ -92,5 +97,8 @@ cd app && ./build.sh && ./build-intel.sh   # 2 bản .dmg (arm64 + Intel)
 - [ ] ESC hủy được ở mọi mode; đa màn hình (Mac); (VM 1 màn)
 - [ ] *(v1.2)* Vẽ tay: nét đặc/mượt, 1-click = chấm, đổi màu giữa chừng không đổi nét cũ, export đúng ở 1x + 2x
 - [ ] *(v1.2)* Chụp/quay khi app khác đang FULLSCREEN (Mac): overlay hiện đè, không văng khỏi fullscreen
+- [ ] *(v1.3)* **Mode 6** (⌘6 / Ctrl+Alt+6): lần đầu → hộp chọn thư mục (không checkbox) → lưu; lần 2+ → lưu thẳng + toast tên file; clipboard vẫn có ảnh; 2 lần cùng giây → `-1.png`; đổi thư mục + hotkey trong Settings có hiệu lực; Huỷ hộp chọn → app không kẹt
+- [ ] *(v1.3)* **Mode 3**: hộp nhập kích thước KHÔNG bị dính vào ảnh đóng băng/ảnh chụp
+- [ ] *(v1.3)* **GIF RAM**: quay vùng lớn 10s → RAM app không vượt ~vài trăm MB (Activity Monitor / Task Manager)
 
-*Cập nhật lần cuối: 2026-07 · v1.2: Vẽ tay + chụp/quay khi fullscreen (menu-bar mode) + viền editor sáng + ESC editor qua tap.*
+*Cập nhật lần cuối: 2026-07 · v1.3: Mode 6 tự lưu + fix Mode 3 dialog-trong-freeze + giảm 9× RAM quay GIF. (v1.2: Vẽ tay + fullscreen menu-bar mode.)*

@@ -144,6 +144,50 @@ def t_dpi():
     assert M((10, 20, 30, 40), lap100, m) == (10, 20, 30, 40, 1.0)
 check("DPI: map_logical_to_physical @125% + @100%", t_dpi)
 
+print("\n══ BLOCK 10 · Mode 6 (tự lưu) + GIF downscale ══")
+def t_mode6_config():
+    import config, json, tempfile
+    # hotkey mode6 có mặt trong DEFAULTS
+    assert config._DEFAULT_HOTKEYS.get("mode6") in ("<cmd>+6", "<ctrl>+<alt>+6")
+    # deep-merge bơm mode6 vào config CŨ trên đĩa (không cần migration)
+    tmp = tempfile.mktemp(suffix=".json")
+    json.dump({"hotkeys": {"mode1": "<cmd>+1"}}, open(tmp, "w"))
+    c = config.Config(path=tmp)
+    assert c.hotkey("mode6") == config._DEFAULT_HOTKEYS["mode6"]
+    # mode6_dir round-trip + normpath (bỏ separator cuối) + không đụng save_dir
+    assert c.mode6_dir() == ""
+    c.set_mode6_dir("/tmp/fc_m6/")
+    d = config.Config(path=tmp)
+    assert d.mode6_dir() == "/tmp/fc_m6"
+    assert d.get("save_dir") == config.DEFAULT_SAVE_DIR
+    os.remove(tmp)
+check("config: mode6 hotkey deep-merge + mode6_dir round-trip", t_mode6_config)
+
+def t_unique_path():
+    import capture
+    taken = {os.path.join("/d", "a.png"), os.path.join("/d", "a-1.png")}
+    assert capture.unique_path("/d", "a", ".png",
+                               exists=lambda p: False).endswith("a.png")
+    assert capture.unique_path("/d", "a", ".png",
+                               exists=lambda p: p in taken).endswith("a-2.png")
+check("unique_path: hậu tố -1/-2 khi trùng tên cùng giây", t_unique_path)
+
+def t_gif_downscale():
+    # Frame quá cap phải được thu nhỏ NGAY lúc quay (fix "app ăn RAM") và
+    # export không thu nhỏ lần 2 (factor = 1.0 khi frame đã <= cap).
+    from PIL import Image
+    import recorder
+    f = Image.new("RGB", (2400, 1600))
+    try:
+        rs = Image.Resampling.LANCZOS
+    except AttributeError:
+        rs = Image.LANCZOS
+    f.thumbnail((recorder._MAX_LONG_SIDE, recorder._MAX_LONG_SIDE), rs)
+    assert max(f.size) == recorder._MAX_LONG_SIDE == 1000
+    r = recorder.GifRecorder(0, 0, 100, 100, fps=10)
+    assert r._downscale_factor(f) == 1.0   # đã nhỏ → export giữ nguyên
+check("GIF: downscale lúc quay + export không resize lần 2", t_gif_downscale)
+
 print("\n════════════════════════════════════")
 print("  KẾT QUẢ:  \033[92m%d PASS\033[0m · \033[91m%d FAIL\033[0m" % (PASS, FAIL))
 print("════════════════════════════════════")

@@ -158,6 +158,7 @@ _HOTKEY_ROWS = [
     ("mode3", "Chụp khóa kích thước"),
     ("mode4", "Chụp cửa sổ"),
     ("mode5", "Quay GIF"),
+    ("mode6", "Chụp + tự lưu"),
     ("floatingbar", "Thanh nổi"),
 ]
 
@@ -181,6 +182,8 @@ class SettingsWindow(QtWidgets.QWidget):
         self._autolaunch_chk = None      # auto-launch on login
         self._save_dir = self._cfg.save_dir()
         self._save_dir_lbl = None        # muted QLabel showing current folder
+        self._m6_dir = self._cfg.mode6_dir()      # Mode 6 auto-save folder
+        self._m6_dir_lbl = None
 
         self.setWindowTitle("FC-FastCapture — Cài đặt")
         self.setMinimumWidth(580)
@@ -410,6 +413,26 @@ class SettingsWindow(QtWidgets.QWidget):
         row.addWidget(btn)
         row.addStretch(1)
         lay.addLayout(row)
+
+        # Mode 6 — the auto-save folder ("Chụp + tự lưu"). Separate from the
+        # editor save folder above; first ⌘6 capture asks if still empty.
+        lay.addSpacing(8)
+        sub6 = QtWidgets.QLabel("Thư mục tự lưu (Chụp + tự lưu)")
+        sub6.setProperty("role", "muted")
+        lay.addWidget(sub6)
+        self._m6_dir_lbl = QtWidgets.QLabel(
+            self._m6_dir or "(chưa chọn — lần chụp đầu sẽ hỏi)")
+        self._m6_dir_lbl.setProperty("role", "secondary")
+        self._m6_dir_lbl.setWordWrap(True)
+        lay.addWidget(self._m6_dir_lbl)
+        lay.addSpacing(2)
+        btn6 = QtWidgets.QPushButton("Chọn thư mục tự lưu...")
+        btn6.setProperty("variant", "secondary")
+        btn6.clicked.connect(self._pick_m6_dir)
+        row6 = QtWidgets.QHBoxLayout()
+        row6.addWidget(btn6)
+        row6.addStretch(1)
+        lay.addLayout(row6)
         return frame
 
     def _build_footer(self):
@@ -445,6 +468,18 @@ class SettingsWindow(QtWidgets.QWidget):
             self._save_dir = chosen
             if self._save_dir_lbl is not None:
                 self._save_dir_lbl.setText(chosen)
+
+    def _pick_m6_dir(self):
+        try:
+            start = self._m6_dir or self._save_dir or ""
+            chosen = QtWidgets.QFileDialog.getExistingDirectory(
+                self, "Chọn thư mục tự lưu (Chụp + tự lưu)", start)
+        except Exception:
+            chosen = ""
+        if chosen:
+            self._m6_dir = chosen
+            if self._m6_dir_lbl is not None:
+                self._m6_dir_lbl.setText(chosen)
 
     def _on_save(self):
         """Persist every control, sync auto-launch, emit `saved`, close."""
@@ -488,6 +523,14 @@ class SettingsWindow(QtWidgets.QWidget):
         try:
             if self._save_dir:
                 self._cfg.set_save_dir(self._save_dir)
+        except Exception:
+            pass
+
+        # Mode 6 auto-save folder (only when the user actually picked one —
+        # empty means "keep asking on first capture").
+        try:
+            if self._m6_dir:
+                self._cfg.set_mode6_dir(self._m6_dir)
         except Exception:
             pass
 
