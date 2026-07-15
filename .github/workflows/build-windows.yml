@@ -7,7 +7,12 @@ name: Build Windows (.exe)
 # published rollback build. To attach to a release, push a version tag (below).
 
 on:
-  workflow_dispatch: {}          # run on demand from the Actions tab
+  workflow_dispatch:             # run on demand (Actions tab / gh workflow run)
+    inputs:
+      release_tag:
+        description: 'Đính .exe vào release tag này (để trống = chỉ build artifact)'
+        required: false
+        default: ''
   push:
     branches: [main]
     paths:
@@ -90,7 +95,11 @@ jobs:
       # IS the release, so this can never clobber a different version's asset.
       # A plain push to main just leaves the run artifact for testing.
       - name: Attach to the tagged release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" "dist/FC-FastCapture-Windows.exe" --clobber
+        # NOTE: dùng ${{ }} (Actions expression — thay thế TRƯỚC khi shell chạy).
+        # KHÔNG dùng "$GITHUB_REF_NAME" — shell mặc định trên windows-latest là
+        # PowerShell, cú pháp bash nở thành chuỗi RỖNG → "release not found"
+        # (đã dính 3 lần). Input release_tag cho phép đính từ main khi cần.
+        run: gh release upload "${{ inputs.release_tag || github.ref_name }}" "dist/FC-FastCapture-Windows.exe" --clobber
