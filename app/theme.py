@@ -19,7 +19,7 @@ import os
 # Identity
 # ─────────────────────────────────────────────────────────────────────────────
 APP_NAME = "FC-FastCapture"
-APP_VERSION = "1.3.1"        # single source of truth — build scripts + About read this
+APP_VERSION = "1.4"        # single source of truth — build scripts + About read this
 BRAND = "10XLifeOS"
 SIGNATURE = "Dev by Thắng Huyền Đức · 10X-LifeOS.Com"
 
@@ -488,6 +488,26 @@ def mode_icon(n, size=22, color=None):
         p.setPen(_Qt.PenStyle.NoPen)
         p.setBrush(qcolor(col))
         p.drawEllipse(QPointF(0.50 * S, 0.50 * S), 0.16 * S, 0.16 * S)
+    elif n == 6:                    # Auto-save → folder + down arrow
+        # Folder: tab + body (outline, consistent 2px stroke).
+        path = QtGui.QPainterPath()
+        path.moveTo(0.14 * S, 0.34 * S)
+        path.lineTo(0.14 * S, 0.26 * S)
+        path.lineTo(0.38 * S, 0.26 * S)          # tab top
+        path.lineTo(0.46 * S, 0.34 * S)          # tab slope
+        path.lineTo(0.86 * S, 0.34 * S)
+        path.lineTo(0.86 * S, 0.78 * S)
+        path.lineTo(0.14 * S, 0.78 * S)
+        path.closeSubpath()
+        p.drawPath(path)
+        # Arrow dropping INTO the folder (filled head, stroked shaft).
+        p.drawLine(QPointF(0.50 * S, 0.06 * S), QPointF(0.50 * S, 0.52 * S))
+        p.setPen(_Qt.PenStyle.NoPen)
+        p.setBrush(qcolor(col))
+        head = QtGui.QPolygonF([QPointF(0.38 * S, 0.50 * S),
+                                QPointF(0.62 * S, 0.50 * S),
+                                QPointF(0.50 * S, 0.66 * S)])
+        p.drawPolygon(head)
     p.end()
     return pm
 

@@ -1334,7 +1334,8 @@ class Controller(QtCore.QObject):
             self.open_bar()
 
     def _bar_mode(self, n):
-        [None, self.mode1, self.mode2, self.mode3, self.mode4, self.mode5][n]()
+        [None, self.mode1, self.mode2, self.mode3, self.mode4, self.mode5,
+         self.mode6][n]()
 
     # ── settings / misc ──────────────────────────────────────────────────
     def open_settings(self):
