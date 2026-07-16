@@ -57,6 +57,12 @@ class Toast(QtWidgets.QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        # DESTROY on close — without this the closed toast's QWidget (kept
+        # alive by the self↔fade-animation reference cycle until the cyclic
+        # GC runs) leaves its hidden NSWindow inside NSApp.windows(), where
+        # the NEXT same-size toast's pin_over_all_spaces() could match it and
+        # orderFrontRegardless() it back — an immortal black box on screen.
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
 
         self._build_ui()
 
@@ -175,6 +181,10 @@ class Toast(QtWidgets.QWidget):
             self._move_to_corner()  # re-place after the final size is known
             self._start_fade_in()
             self._timer.start()
+            # Watchdog: force-destroy at 2× lifetime no matter what — a toast
+            # must NEVER be able to stay on screen (it sits at shield level
+            # over every Space in menu-bar mode; stuck = covers everything).
+            QTimer.singleShot(_AUTO_CLOSE_MS * 2, self.deleteLater)
         except Exception:
             # If showing fails, make sure we are not leaking a dead ref.
             try:
@@ -206,6 +216,12 @@ class Toast(QtWidgets.QWidget):
         try:
             if self._timer.isActive():
                 self._timer.stop()
+        except Exception:
+            pass
+        try:
+            # Break the self↔animation reference cycle explicitly so the
+            # object dies by refcount, not "whenever the cyclic GC runs".
+            self._fade = None
         except Exception:
             pass
         try:

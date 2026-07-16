@@ -19,7 +19,7 @@ import os
 # Identity
 # ─────────────────────────────────────────────────────────────────────────────
 APP_NAME = "FC-FastCapture"
-APP_VERSION = "1.3"          # single source of truth — build scripts + About read this
+APP_VERSION = "1.3.1"        # single source of truth — build scripts + About read this
 BRAND = "10XLifeOS"
 SIGNATURE = "Dev by Thắng Huyền Đức · 10X-LifeOS.Com"
 

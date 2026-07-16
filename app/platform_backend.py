@@ -96,6 +96,13 @@ def raise_window_over_fullscreen(widget):
         gw, gh = int(widget.width()), int(widget.height())
         target = None
         for w in NSApp.windows():
+            # ONLY visible windows. A closed toast's NSWindow lingers in
+            # NSApp.windows() until Python GC frees the widget; matching it by
+            # size and calling orderFrontRegardless() RESURRECTED that corpse
+            # as an immortal shield-level black box over every Space (user
+            # report 16/07: "vết đen che màn hình", migrated across displays).
+            if not w.isVisible():
+                continue
             fr = w.frame()
             if abs(int(fr.size.width) - gw) <= 8 \
                     and abs(int(fr.size.height) - gh) <= 8:
