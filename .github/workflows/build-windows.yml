@@ -51,7 +51,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          python -c "import platform_backend, config, capture, windows, autolaunch, overlay, settings, editor, floatingbar, recorder, notify, theme, main, hotkeys_win, winshot; print('all modules import OK on Windows')"
+          python -c "import platform_backend, config, capture, windows, autolaunch, overlay, settings, editor, floatingbar, recorder, notify, theme, main, hotkeys_win, winshot, ocr, ocr_popup; print('all modules import OK on Windows')"
 
       - name: Generate FC.ico
         env:

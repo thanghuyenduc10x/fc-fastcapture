@@ -451,6 +451,7 @@ class Controller(QtCore.QObject):
         self.editor = None
         self.recorder = None
         self.stopbtn = None
+        self._ocr_popups = []      # Mode 7 result popups (removed on close)
         self.gifresult = None
         self.recframe = None
         self.bar = None
@@ -499,6 +500,7 @@ class Controller(QtCore.QObject):
         add("Chụp cửa sổ", "mode4", self.mode4)
         add("Quay GIF", "mode5", self.mode5)
         add("Chụp + tự lưu", "mode6", self.mode6)
+        add("Quét lấy chữ (OCR)", "mode7", self.mode7)
         menu.addSeparator()
         add("Mở thanh nổi", "floatingbar", self.open_bar)
         add("Settings", "", self.open_settings)
@@ -551,7 +553,7 @@ class Controller(QtCore.QObject):
 
     def _rebuild_combos(self):
         names = ["mode1", "mode2", "mode3", "mode4", "mode5", "mode6",
-                 "floatingbar"]
+                 "mode7", "floatingbar"]
         self._combos = {}
         for name in names:
             parsed = self._parse_combo(self.cfg.hotkey(name))
@@ -705,7 +707,7 @@ class Controller(QtCore.QObject):
         {
             "mode1": self.mode1, "mode2": self.mode2, "mode3": self.mode3,
             "mode4": self.mode4, "mode5": self.mode5, "mode6": self.mode6,
-            "floatingbar": self.toggle_bar,
+            "mode7": self.mode7, "floatingbar": self.toggle_bar,
         }.get(name, lambda: None)()
 
     # ── MENU-BAR MODE: tap-forwarded overlay ESC/Enter (no key window) ──
@@ -968,6 +970,45 @@ class Controller(QtCore.QObject):
         # EVERY exit path must release the busy-guard or all captures lock up.
         self.overlay = None
         self._end_capture()
+
+    # ── MODE 7 — capture → OCR (extract text) via OpenRouter (v1.5) ───────
+    # Select a region like Mode 1; instead of the image, run OCR and show an
+    # editable popup (⌘↵ copy · Esc close). The network call runs in a worker
+    # thread so the UI never freezes; the capture busy-guard is released as
+    # soon as the region is picked (the popup has its own lifecycle).
+    def mode7(self):
+        if self._capture_busy():
+            return
+        def build(frozen):
+            ov = SelectionOverlay(mode="free", frozen=frozen)
+            ov.selected.connect(lambda r: self._grab(r, self._after_mode7))
+            return ov
+        self._start_frozen_overlay(build)
+
+    def _after_mode7(self, shot):
+        # Capture is done the instant the region is cropped — release the
+        # guard NOW so ⌘1..⌘6 work while OCR is still loading.
+        self.overlay = None
+        self._end_capture()
+        key = self.cfg.openrouter_api_key()
+        if not key:
+            show_toast("Mode 7 cần API key OpenRouter — mở Settings để nhập",
+                       ok=False)
+            log("• MODE 7 · Chưa có API key — bỏ qua")
+            return
+        try:
+            from ocr_popup import OcrResultPopup
+            popup = OcrResultPopup(shot.image, key, self.cfg.openrouter_model())
+            # Keep a ref so it isn't GC'd; drop it when it closes.
+            self._ocr_popups.append(popup)
+            popup.destroyed.connect(
+                lambda *_: self._ocr_popups.remove(popup)
+                if popup in self._ocr_popups else None)
+            popup.start()
+            log("▸ MODE 7 · Đang OCR vùng %dx%d…" % (shot.rect[2], shot.rect[3]))
+        except Exception as e:
+            show_toast("Không mở được OCR: %s" % e, ok=False)
+            log("✕ MODE 7 · %s" % e)
 
     # ── MODE 2 / 3 / 4 — capture then edit in place ──────────────────────
     def mode2(self):
@@ -1335,7 +1376,7 @@ class Controller(QtCore.QObject):
 
     def _bar_mode(self, n):
         [None, self.mode1, self.mode2, self.mode3, self.mode4, self.mode5,
-         self.mode6][n]()
+         self.mode6, self.mode7][n]()
 
     # ── settings / misc ──────────────────────────────────────────────────
     def open_settings(self):

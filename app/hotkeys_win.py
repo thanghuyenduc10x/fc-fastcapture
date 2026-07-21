@@ -35,7 +35,7 @@ MOD_NOREPEAT = 0x4000
 WM_HOTKEY = 0x0312
 
 # The six bindable actions, in the same order the rest of the app uses.
-_HOTKEY_NAMES = ["mode1", "mode2", "mode3", "mode4", "mode5", "mode6", "floatingbar"]
+_HOTKEY_NAMES = ["mode1", "mode2", "mode3", "mode4", "mode5", "mode6", "mode7", "floatingbar"]
 
 
 def _vk_for_char(ch):

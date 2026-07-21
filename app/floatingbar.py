@@ -34,6 +34,7 @@ _MODE_TOOLTIPS = {
     4: "Chụp cửa sổ",
     5: "Quay GIF",
     6: "Chụp + tự lưu",
+    7: "Quét lấy chữ (OCR)",
 }
 
 
@@ -130,9 +131,9 @@ class FloatingBar(QtWidgets.QWidget):
         row.addWidget(sep)
         row.addSpacing(2)
 
-        # Six ghost mode buttons with vector icons + Vietnamese tooltips.
+        # Seven ghost mode buttons with vector icons + Vietnamese tooltips.
         tool_qss = theme.qss_tool_btn()
-        for n in range(1, 7):
+        for n in range(1, 8):
             btn = QtWidgets.QPushButton(self._panel)
             btn.setToolTip(_MODE_TOOLTIPS[n])
             btn.setStyleSheet(tool_qss)

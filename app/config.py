@@ -32,6 +32,7 @@ if _IS_WIN:
         "mode4": "<ctrl>+<alt>+4",   # Window capture + edit
         "mode5": "<ctrl>+<alt>+5",   # Record → GIF
         "mode6": "<ctrl>+<alt>+6",   # Capture → auto-save to fixed folder (v1.3)
+        "mode7": "<ctrl>+<alt>+7",   # Capture → OCR (extract text) (v1.5)
         "floatingbar": "<ctrl>+<alt>+0",
     }
 else:
@@ -42,6 +43,7 @@ else:
         "mode4": "<cmd>+4",   # Window capture + edit
         "mode5": "<cmd>+5",   # Record → GIF
         "mode6": "<cmd>+6",   # Capture → auto-save to fixed folder (v1.3)
+        "mode7": "<cmd>+7",   # Capture → OCR (extract text) (v1.5)
         "floatingbar": "<cmd>+0",
     }
 
@@ -63,6 +65,11 @@ DEFAULTS = {
     # Mode 6 — capture → auto-save (v1.3). Empty = not chosen yet → the FIRST
     # mode-6 capture shows the folder picker, then saves silently ever after.
     "mode6_dir": "",
+    # Mode 7 — capture → OCR via OpenRouter (v1.5). Key entered by the user in
+    # Settings (stored locally; NEVER committed/logged). Empty key → Mode 7
+    # shows a hint to add it.
+    "openrouter_api_key": "",
+    "openrouter_model": "google/gemini-2.5-flash-lite",
     # GIF
     "gif_fps": 15,
 }
@@ -253,6 +260,23 @@ class Config:
             return path
         except OSError:
             return ""
+
+    # ── Mode 7: OCR via OpenRouter (v1.5) ────────────────────────────────
+    def openrouter_api_key(self):
+        return self.data.get("openrouter_api_key", "") or ""
+
+    def set_openrouter_api_key(self, key):
+        self.data["openrouter_api_key"] = (key or "").strip()
+        self.save()
+
+    def openrouter_model(self):
+        return (self.data.get("openrouter_model")
+                or "google/gemini-2.5-flash-lite")
+
+    def set_openrouter_model(self, model):
+        self.data["openrouter_model"] = (model or "").strip() \
+            or "google/gemini-2.5-flash-lite"
+        self.save()
 
 
 _SINGLETON = None

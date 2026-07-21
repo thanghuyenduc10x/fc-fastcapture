@@ -159,6 +159,7 @@ _HOTKEY_ROWS = [
     ("mode4", "Chụp cửa sổ"),
     ("mode5", "Quay GIF"),
     ("mode6", "Chụp + tự lưu"),
+    ("mode7", "Quét lấy chữ (OCR)"),
     ("floatingbar", "Thanh nổi"),
 ]
 
@@ -184,6 +185,8 @@ class SettingsWindow(QtWidgets.QWidget):
         self._save_dir_lbl = None        # muted QLabel showing current folder
         self._m6_dir = self._cfg.mode6_dir()      # Mode 6 auto-save folder
         self._m6_dir_lbl = None
+        self._or_key_edit = None          # Mode 7 OpenRouter API key field
+        self._or_model_edit = None        # Mode 7 model field
 
         self.setWindowTitle("FC-FastCapture — Cài đặt")
         self.setMinimumWidth(580)
@@ -247,6 +250,7 @@ class SettingsWindow(QtWidgets.QWidget):
         root.addWidget(self._build_locked_size())
         root.addWidget(self._build_toggles())
         root.addWidget(self._build_save_dir())
+        root.addWidget(self._build_ocr())
         root.addStretch(1)
 
         # Footer (Lưu / Đóng) is PINNED below the scroll area — never scrolls
@@ -481,6 +485,45 @@ class SettingsWindow(QtWidgets.QWidget):
             if self._m6_dir_lbl is not None:
                 self._m6_dir_lbl.setText(chosen)
 
+    def _build_ocr(self):
+        """Mode 7 (Quét lấy chữ / OCR) — OpenRouter API key + model. The key is
+        stored locally in ~/.fc_fastcapture.json and never leaves the machine
+        except in the Authorization header of the OCR call the user triggers."""
+        frame, lay = self._panel()
+        lay.addWidget(self._section_title("Quét lấy chữ — OCR (Mode 7)"))
+
+        note = QtWidgets.QLabel(
+            "Mode 7 gửi vùng ảnh đã chọn tới OpenRouter để đọc chữ (cần "
+            "internet). Ảnh RỜI MÁY lên dịch vụ — đừng dùng cho nội dung nhạy "
+            "cảm. Key lưu trên máy này, không chia sẻ.")
+        note.setProperty("role", "muted")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+
+        lay.addSpacing(4)
+        klbl = QtWidgets.QLabel("OpenRouter API key")
+        klbl.setProperty("role", "muted")
+        lay.addWidget(klbl)
+        self._or_key_edit = QtWidgets.QLineEdit(self._cfg.openrouter_api_key())
+        self._or_key_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self._or_key_edit.setPlaceholderText("sk-or-...")
+        lay.addWidget(self._or_key_edit)
+        show = QtWidgets.QCheckBox("Hiện key")
+        show.toggled.connect(lambda on: self._or_key_edit.setEchoMode(
+            QtWidgets.QLineEdit.EchoMode.Normal if on
+            else QtWidgets.QLineEdit.EchoMode.Password))
+        lay.addWidget(show)
+
+        lay.addSpacing(4)
+        mlbl = QtWidgets.QLabel("Model (mặc định: gemini-2.5-flash-lite — rẻ, tiếng "
+                                "Việt tốt)")
+        mlbl.setProperty("role", "muted")
+        lay.addWidget(mlbl)
+        self._or_model_edit = QtWidgets.QLineEdit(self._cfg.openrouter_model())
+        self._or_model_edit.setPlaceholderText("google/gemini-2.5-flash-lite")
+        lay.addWidget(self._or_model_edit)
+        return frame
+
     def _on_save(self):
         """Persist every control, sync auto-launch, emit `saved`, close."""
         # Hotkeys — store the recorded pynput strings.
@@ -531,6 +574,15 @@ class SettingsWindow(QtWidgets.QWidget):
         try:
             if self._m6_dir:
                 self._cfg.set_mode6_dir(self._m6_dir)
+        except Exception:
+            pass
+
+        # Mode 7 OCR — OpenRouter key + model (key stored locally, never logged).
+        try:
+            if self._or_key_edit is not None:
+                self._cfg.set_openrouter_api_key(self._or_key_edit.text())
+            if self._or_model_edit is not None:
+                self._cfg.set_openrouter_model(self._or_model_edit.text())
         except Exception:
             pass
 

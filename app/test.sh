@@ -188,6 +188,34 @@ def t_gif_downscale():
     assert r._downscale_factor(f) == 1.0   # đã nhỏ → export giữ nguyên
 check("GIF: downscale lúc quay + export không resize lần 2", t_gif_downscale)
 
+print("\n══ BLOCK 11 · Mode 7 (OCR OpenRouter) ══")
+def t_ocr():
+    import ocr, config, json
+    from PIL import Image
+    img = Image.new("RGB", (30, 12), (255, 255, 255))
+    # payload đúng cấu trúc OpenRouter (text + image data-url)
+    pl = ocr.build_payload(img, "google/gemini-2.5-flash-lite")
+    assert pl["model"] == "google/gemini-2.5-flash-lite"
+    c = pl["messages"][0]["content"]
+    assert c[0]["type"] == "text" and c[1]["type"] == "image_url"
+    assert c[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    # parse cả content=string lẫn content=list, giữ unicode tiếng Việt
+    assert ocr.parse_response(json.dumps(
+        {"choices": [{"message": {"content": "Cà phê\nsữa"}}]})) == "Cà phê\nsữa"
+    assert ocr.parse_response(json.dumps(
+        {"choices": [{"message": {"content": [{"type": "text",
+         "text": "ăn"}]}}]})) == "ăn"
+    # không key → OcrError (không gọi mạng)
+    try:
+        ocr.extract_text(img, "")
+        assert False
+    except ocr.OcrError:
+        pass
+    # config: hotkey mode7 + model mặc định + deep-merge vào config cũ
+    assert config._DEFAULT_HOTKEYS.get("mode7") in ("<cmd>+7", "<ctrl>+<alt>+7")
+    assert "openrouter_model" in config.DEFAULTS
+check("OCR: payload + parse (VN) + no-key + config mode7", t_ocr)
+
 print("\n════════════════════════════════════")
 print("  KẾT QUẢ:  \033[92m%d PASS\033[0m · \033[91m%d FAIL\033[0m" % (PASS, FAIL))
 print("════════════════════════════════════")

@@ -19,7 +19,7 @@ import os
 # Identity
 # ─────────────────────────────────────────────────────────────────────────────
 APP_NAME = "FC-FastCapture"
-APP_VERSION = "1.4"        # single source of truth — build scripts + About read this
+APP_VERSION = "1.5"        # single source of truth — build scripts + About read this
 BRAND = "10XLifeOS"
 SIGNATURE = "Dev by Thắng Huyền Đức · 10X-LifeOS.Com"
 
@@ -508,6 +508,17 @@ def mode_icon(n, size=22, color=None):
                                 QPointF(0.62 * S, 0.50 * S),
                                 QPointF(0.50 * S, 0.66 * S)])
         p.drawPolygon(head)
+    elif n == 7:                    # OCR → scan frame + text lines
+        # Four corner brackets (a viewfinder) around two "text" lines.
+        c = 0.16 * S               # corner arm length
+        L, R, T, B = 0.16 * S, 0.84 * S, 0.16 * S, 0.84 * S
+        for (x, y, dx, dy) in (
+                (L, T, 1, 1), (R, T, -1, 1), (L, B, 1, -1), (R, B, -1, -1)):
+            p.drawLine(QPointF(x, y), QPointF(x + dx * c, y))
+            p.drawLine(QPointF(x, y), QPointF(x, y + dy * c))
+        # Two text lines in the middle (second shorter, like a paragraph).
+        p.drawLine(QPointF(0.32 * S, 0.44 * S), QPointF(0.68 * S, 0.44 * S))
+        p.drawLine(QPointF(0.32 * S, 0.58 * S), QPointF(0.56 * S, 0.58 * S))
     p.end()
     return pm
 
