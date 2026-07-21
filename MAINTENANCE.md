@@ -69,6 +69,7 @@ cd app && ./build.sh && ./build-intel.sh   # 2 bản .dmg (arm64 + Intel)
 ## Gotchas hạ tầng (đã trả học phí — đừng dính lại)
 - **PyInstaller không cross-compile** → Windows PHẢI build trên `windows-latest` (CI); bincache hỏng → `rm -rf ~/Library/Application\ Support/pyinstaller`.
 - **KHÔNG chạy 2 build PyInstaller SONG SONG** (arm64 + Intel cùng lúc) — chúng đua nhau ghi cùng bincache root → "Failed to process binary …" ở cả 2 phía (dính khi build v1.3). Build TUẦN TỰ: arm xong mới intel.
+- **Đường dẫn dự án có DẤU CÁCH** ("10X-App Vibe Coding/…") làm `build-intel.sh` vỡ: `$ICON_FLAG` không quote → `$(pwd)/…/FC.icns` tách thành nhiều tham số → "pyinstaller: error: unrecognized arguments: main.py" (dính khi build v1.5). Fix: dùng MẢNG bash `ICON_ARGS=(--icon "$path")` + `"${ICON_ARGS[@]}"`. Quy tắc: mọi biến chứa path phải quote; ưu tiên thư mục dự án KHÔNG dấu cách.
 - **File workflow** (`.github/workflows/`) đẩy qua **Git Data API** (Contents API chặn nếu thiếu scope `workflow`). *(Repo local giờ là clone chuẩn → `git push` thường là đủ.)*
 - **Chữ ký macOS cố định** ("FC-FastCapture Dev (10XLifeOS)", keychain `fc-codesign.keychain-db`) → giữ quyền TCC qua các build; đổi chữ ký = reset quyền người dùng.
 - **DPI Windows**: overlay trả toạ độ *logical*, mss nhận *physical* → phải map qua `capture.logical_rect_to_physical` / crop từ ảnh freeze. Test ở 100/125/150%.

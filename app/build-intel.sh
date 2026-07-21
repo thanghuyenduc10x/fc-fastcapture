@@ -34,7 +34,10 @@ app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 import theme; theme.load_fonts()
 theme.app_icon_pixmap(512).save("build-intel/icon_master.png")
 PYI
-ICON_FLAG=""
+# Use an ARRAY, not a string — the project path may contain spaces
+# ("10X-App Vibe Coding/…"); an unquoted `$ICON_FLAG` word-splits the icon
+# path into extra args → "pyinstaller: error: unrecognized arguments: main.py".
+ICON_ARGS=()
 if [ -f build-intel/icon_master.png ]; then
   for s in 16 32 128 256 512; do
     sips -z $s $s build-intel/icon_master.png --out "build-intel/FC.iconset/icon_${s}x${s}.png" >/dev/null 2>&1
@@ -42,7 +45,7 @@ if [ -f build-intel/icon_master.png ]; then
     sips -z $s2 $s2 build-intel/icon_master.png --out "build-intel/FC.iconset/icon_${s}x${s}@2x.png" >/dev/null 2>&1
   done
   if iconutil -c icns build-intel/FC.iconset -o build-intel/FC.icns 2>/dev/null && [ -f build-intel/FC.icns ]; then
-    ICON_FLAG="--icon=$(pwd)/build-intel/FC.icns"; echo "  ✓ FC.icns"
+    ICON_ARGS=(--icon "$(pwd)/build-intel/FC.icns"); echo "  ✓ FC.icns"
   fi
 fi
 
@@ -51,7 +54,7 @@ $X "$PYX" -m PyInstaller \
   --name "FC-FastCapture" \
   --windowed --noconfirm --clean \
   --distpath "$DIST" --workpath build-intel/work --specpath build-intel \
-  $ICON_FLAG \
+  "${ICON_ARGS[@]}" \
   --osx-bundle-identifier "com.10xlifeos.fcfastcapture" \
   --hidden-import Quartz \
   --hidden-import AppKit \
